@@ -1,0 +1,97 @@
+{
+  "metadata": {
+    "title": "DramaAI - AI Short Drama Studio",
+    "description": "Turn your stories into professional short dramas — built for Hong Kong and global creators"
+  },
+  "nav": {
+    "logo": "DramaAI",
+    "features": "Features",
+    "pricing": "Pricing",
+    "gallery": "Gallery",
+    "signIn": "Sign in",
+    "signUp": "Get started free",
+    "recharge": "Top up",
+    "credits": "{count} cr",
+    "creditsLabel": "Credits balance"
+  },
+  "pricing": {
+    "title": "Buy credits",
+    "subtitle": "Choose a plan and pay securely with Stripe — cards worldwide accepted",
+    "popular": "Most popular",
+    "perMonth": "/ mo",
+    "creditsIncluded": "{count} credits included",
+    "buyNow": "Buy now",
+    "subscribe": "Subscribe to Pro",
+    "successMessage": "Payment successful! Credits have been added — your balance in the header will update shortly.",
+    "canceledMessage": "Checkout canceled. You can return anytime to complete your purchase.",
+    "signInRequired": "Please sign in before purchasing credits",
+    "signInToPurchase": "Sign in to purchase",
+    "plans": {
+      "credits_100": {
+        "name": "Starter",
+        "description": "Great for trying DramaAI",
+        "features": ["100 credits", "One-time purchase", "Visa / Mastercard"]
+      },
+      "credits_500": {
+        "name": "Creator",
+        "description": "Best value for frequent creators",
+        "features": ["500 credits", "One-time purchase", "Priority render queue"]
+      },
+      "pro_monthly": {
+        "name": "Pro Monthly",
+        "description": "Recurring subscription with Pro perks",
+        "features": ["300 credits / month", "Pro badge", "Priority support"]
+      }
+    }
+  },
+  "hero": {
+    "badge": "AI Short Drama · Now Live",
+    "title": "Turn your story into a pro short drama—instantly",
+    "subtitle": "Paste your novel or script, upload reference images, pick a visual style, and generate storyboards and video in one click. Built for Hong Kong and overseas creators.",
+    "cta": "Start creating"
+  },
+  "generator": {
+    "storyLabel": "Story / Script",
+    "storyPlaceholder": "Paste your novel chapter, screenplay, or creative outline…\n\nExample: Late at night on the streets of Hong Kong, neon lights reflect off rain-soaked pavement. Lin Wei receives a mysterious call…",
+    "imagesLabel": "Reference images",
+    "imagesHint": "Drag & drop or click to upload, up to {max} images (characters, scenes, mood)",
+    "styleLabel": "Visual style",
+    "generate": "Generate short drama",
+    "generating": "Generating…",
+    "charCount": "{current} / {max} chars"
+  },
+  "styles": {
+    "anime": "Anime",
+    "realistic": "Realistic",
+    "hongkong": "HK Retro",
+    "cinematic": "Cinematic",
+    "fantasy": "Fantasy",
+    "noir": "Film Noir"
+  },
+  "preview": {
+    "title": "Preview",
+    "empty": "Your generated content will appear here",
+    "emptyHint": "Storyboards, video clips, and export options will show in this area",
+    "scene": "Scene {index}",
+    "duration": "{seconds}s",
+    "status": {
+      "idle": "Waiting",
+      "processing": "AI rendering",
+      "done": "Complete"
+    }
+  },
+  "auth": {
+    "signInTitle": "Sign in - DramaAI",
+    "signUpTitle": "Sign up - DramaAI",
+    "promptTitle": "Sign in to try short drama generation for free",
+    "promptDescription": "Create an account to access AI storyboards and video generation — built for Hong Kong and global creators.",
+    "signInCta": "Sign in",
+    "signUpCta": "Get started free"
+  },
+  "locale": {
+    "label": "Language",
+    "zh-CN": "简体中文",
+    "zh-HK": "繁體中文",
+    "en": "English"
+  }
+}

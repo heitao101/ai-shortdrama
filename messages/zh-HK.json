@@ -1,0 +1,97 @@
+{
+  "metadata": {
+    "title": "DramaAI - AI 短劇生成平台",
+    "description": "把你的故事瞬間變成專業短劇，面向香港與全球創作者"
+  },
+  "nav": {
+    "logo": "DramaAI",
+    "features": "功能",
+    "pricing": "定價",
+    "gallery": "作品庫",
+    "signIn": "登入",
+    "signUp": "免費註冊",
+    "recharge": "充值",
+    "credits": "{count} 點",
+    "creditsLabel": "剩餘信用點"
+  },
+  "pricing": {
+    "title": "信用點充值",
+    "subtitle": "選擇套餐，透過 Stripe 安全支付，支援香港及海外信用卡",
+    "popular": "最受歡迎",
+    "perMonth": "/ 月",
+    "creditsIncluded": "含 {count} 信用點",
+    "buyNow": "立即購買",
+    "subscribe": "訂閱 Pro",
+    "successMessage": "支付成功！信用點已入帳，Header 餘額將自動更新。",
+    "canceledMessage": "已取消支付，可隨時返回繼續選購。",
+    "signInRequired": "請先登入後再充值",
+    "signInToPurchase": "登入購買",
+    "plans": {
+      "credits_100": {
+        "name": "入門包",
+        "description": "適合初次體驗",
+        "features": ["100 信用點", "單次購買", "支援 Visa / Mastercard"]
+      },
+      "credits_500": {
+        "name": "創作者包",
+        "description": "高性價比，適合頻繁創作",
+        "features": ["500 信用點", "單次購買", "優先渲染佇列"]
+      },
+      "pro_monthly": {
+        "name": "Pro 月訂閱",
+        "description": "每月自動續費，解鎖 Pro 功能",
+        "features": ["每月 300 信用點", "Pro 標識", "優先客服支援"]
+      }
+    }
+  },
+  "hero": {
+    "badge": "AI 短劇 · 全球首發",
+    "title": "把你的故事瞬間變成專業短劇",
+    "subtitle": "輸入小說或劇本，上傳參考圖，選擇風格，一鍵生成分鏡與影片。專為香港及海外創作者打造。",
+    "cta": "立即開始創作"
+  },
+  "generator": {
+    "storyLabel": "故事 / 劇本",
+    "storyPlaceholder": "貼上你的小說章節、劇本或創意大綱…\n\n例如：深夜的香港街頭，霓虹燈映照著雨後的路面。女主角林薇接到一通神秘電話…",
+    "imagesLabel": "參考圖片",
+    "imagesHint": "拖曳或點擊上傳，最多 {max} 張（角色、場景、氛圍參考）",
+    "styleLabel": "視覺風格",
+    "generate": "一鍵生成短劇",
+    "generating": "正在生成中…",
+    "charCount": "{current} / {max} 字"
+  },
+  "styles": {
+    "anime": "動漫",
+    "realistic": "寫實",
+    "hongkong": "港風",
+    "cinematic": "電影感",
+    "fantasy": "奇幻",
+    "noir": "黑色電影"
+  },
+  "preview": {
+    "title": "生成預覽",
+    "empty": "生成結果將在此展示",
+    "emptyHint": "分鏡、影片片段與匯出選項將出現在此區域",
+    "scene": "分鏡 {index}",
+    "duration": "{seconds}s",
+    "status": {
+      "idle": "等待生成",
+      "processing": "AI 渲染中",
+      "done": "已完成"
+    }
+  },
+  "auth": {
+    "signInTitle": "登入 - DramaAI",
+    "signUpTitle": "註冊 - DramaAI",
+    "promptTitle": "登入後即可免費試用生成短劇",
+    "promptDescription": "註冊帳號即可使用 AI 分鏡與影片生成，專為香港及海外創作者打造。",
+    "signInCta": "立即登入",
+    "signUpCta": "免費註冊"
+  },
+  "locale": {
+    "label": "語言",
+    "zh-CN": "简体中文",
+    "zh-HK": "繁體中文",
+    "en": "English"
+  }
+}
