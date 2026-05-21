@@ -1,15 +1,16 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { NextRequest, NextResponse } from "next/server";
+import { auth, getAuth } from "@clerk/nextjs/server";
 import Stripe from "stripe";
 import { getPlan, getPriceId, type PlanId } from "@/lib/stripe-plans";
 
-/** Isolated from next-intl — this route must always return JSON */
+/** Isolated from next-intl — always returns JSON */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const preferredRegion = "auto";
 
 const VALID_PLAN_IDS: PlanId[] = ["credits_100", "credits_500", "pro_monthly"];
 const DEFAULT_LOCALE = "zh-HK";
+
+const AUTH_TOKEN_TYPES = ["session_token", "oauth_token"] as const;
 
 type RequestBody = {
   planId?: string;
@@ -17,6 +18,12 @@ type RequestBody = {
 };
 
 type JsonBody = Record<string, unknown>;
+
+type ResolvedAuth = {
+  userId: string | null;
+  sessionId: string | null;
+  source: string;
+};
 
 function logEnvPresence() {
   const status = {
@@ -33,7 +40,6 @@ function logEnvPresence() {
   return status;
 }
 
-/** Always JSON — never rely on Next.js HTML error pages reaching the client */
 function jsonResponse(body: JsonBody, status: number) {
   return new NextResponse(JSON.stringify(body), {
     status,
@@ -78,10 +84,7 @@ function createStripeClient(): Stripe {
   return new Stripe(secretKey, {
     typescript: true,
     maxNetworkRetries: 2,
-    appInfo: {
-      name: "DramaAI",
-      version: "0.1.0",
-    },
+    appInfo: { name: "DramaAI", version: "0.1.0" },
   });
 }
 
@@ -99,7 +102,7 @@ function resolveLocale(value: string | undefined): string {
   return DEFAULT_LOCALE;
 }
 
-async function parseBody(request: Request): Promise<RequestBody | null> {
+async function parseBody(request: NextRequest): Promise<RequestBody | null> {
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
     return null;
@@ -114,25 +117,91 @@ async function parseBody(request: Request): Promise<RequestBody | null> {
   }
 }
 
-async function resolveUserId(): Promise<string | null> {
+/**
+ * Resolve Clerk user from API request.
+ * Order: getAuth(request) → auth() with Bearer/cookie (Clerk App Router recommended).
+ */
+async function resolveAuth(request: NextRequest): Promise<ResolvedAuth> {
+  const authHeader = request.headers.get("authorization") ?? "";
+  const hasBearer = authHeader.startsWith("Bearer ");
+  const cookieHeader = request.headers.get("cookie") ?? "";
+
+  console.log("[create-checkout-session] auth probe:", {
+    hasBearer,
+    hasCookie: cookieHeader.length > 0,
+    cookieHasSession: cookieHeader.includes("__session"),
+  });
+
   try {
-    const { userId } = await auth();
-    return userId;
+    const fromRequest = getAuth(request, {
+      acceptsToken: [...AUTH_TOKEN_TYPES],
+    });
+
+    console.log("[create-checkout-session] getAuth(request):", {
+      userId: fromRequest.userId ?? null,
+      sessionId: fromRequest.sessionId ?? null,
+      isAuthenticated: fromRequest.isAuthenticated,
+    });
+
+    if (fromRequest.userId) {
+      return {
+        userId: fromRequest.userId,
+        sessionId: fromRequest.sessionId ?? null,
+        source: "getAuth(request)",
+      };
+    }
   } catch (error) {
-    console.error("[create-checkout-session] auth() failed:", error);
-    return null;
+    console.error("[create-checkout-session] getAuth(request) error:", error);
   }
+
+  try {
+    const fromAuth = await auth({
+      acceptsToken: [...AUTH_TOKEN_TYPES],
+    });
+
+    const authUserId =
+      fromAuth.isAuthenticated && "userId" in fromAuth
+        ? fromAuth.userId
+        : null;
+    const authSessionId =
+      fromAuth.isAuthenticated && "sessionId" in fromAuth
+        ? fromAuth.sessionId
+        : null;
+
+    console.log("[create-checkout-session] auth():", {
+      userId: authUserId,
+      sessionId: authSessionId,
+      isAuthenticated: fromAuth.isAuthenticated,
+    });
+
+    if (authUserId) {
+      return {
+        userId: authUserId,
+        sessionId: authSessionId ?? null,
+        source: "auth()",
+      };
+    }
+  } catch (error) {
+    console.error("[create-checkout-session] auth() error:", error);
+  }
+
+  console.warn("[create-checkout-session] no userId resolved");
+  return { userId: null, sessionId: null, source: "none" };
 }
 
-/** Health check — verify route returns JSON on Vercel (not HTML 404) */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const env = logEnvPresence();
+    const resolved = await resolveAuth(request);
+
     return jsonOk({
       route: "/api/create-checkout-session",
       method: "GET",
       status: "alive",
       stripeConfigured: env.STRIPE_SECRET_KEY,
+      authenticated: Boolean(resolved.userId),
+      userId: resolved.userId,
+      authSource: resolved.source,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -140,18 +209,30 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const env = logEnvPresence();
 
   try {
     if (!env.STRIPE_SECRET_KEY) {
-      console.error("[create-checkout-session] STRIPE_SECRET_KEY is missing");
       return jsonError("Missing Stripe key", 503);
     }
 
-    const userId = await resolveUserId();
+    if (!env.CLERK_SECRET_KEY) {
+      return jsonError("Missing Clerk secret key", 503);
+    }
+
+    const { userId, sessionId, source } = await resolveAuth(request);
+
+    console.log("[create-checkout-session] resolved auth:", {
+      userId: userId ?? null,
+      sessionId: sessionId ?? null,
+      source,
+    });
+
     if (!userId) {
-      return jsonError("Unauthorized — please sign in", 401);
+      return jsonError("Unauthorized — please sign in", 401, {
+        hint: "Send Clerk session cookie or Authorization: Bearer <session_token>",
+      });
     }
 
     const body = await parseBody(request);
@@ -235,10 +316,6 @@ export async function POST(request: Request) {
     });
 
     if (!session.url) {
-      console.error(
-        "[create-checkout-session] Stripe session missing url",
-        session.id
-      );
       return jsonError("Failed to create checkout session", 500);
     }
 
@@ -254,7 +331,10 @@ export async function POST(request: Request) {
     }
 
     if (error instanceof Stripe.errors.StripeError) {
-      return jsonError(error.message || "Stripe API error", error.statusCode ?? 502);
+      return jsonError(
+        error.message || "Stripe API error",
+        error.statusCode ?? 502
+      );
     }
 
     return jsonError("Internal server error", 500, {

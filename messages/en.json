@@ -26,6 +26,12 @@
     "canceledMessage": "Checkout canceled. You can return anytime to complete your purchase.",
     "signInRequired": "Please sign in before purchasing credits",
     "signInToPurchase": "Sign in to purchase",
+    "checkout": {
+      "signInRequired": "Please sign in before purchasing",
+      "tokenError": "Could not get session token. Please sign in again.",
+      "failed": "Unable to start checkout. Please try again.",
+      "processing": "Redirecting…"
+    },
     "plans": {
       "credits_100": {
         "name": "Starter",

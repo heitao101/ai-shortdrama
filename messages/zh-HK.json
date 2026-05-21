@@ -26,6 +26,12 @@
     "canceledMessage": "已取消支付，可隨時返回繼續選購。",
     "signInRequired": "請先登入後再充值",
     "signInToPurchase": "登入購買",
+    "checkout": {
+      "signInRequired": "請先登入後再購買",
+      "tokenError": "無法取得登入憑證，請重新登入後再試",
+      "failed": "無法啟動支付，請稍後再試",
+      "processing": "跳轉支付中…"
+    },
     "plans": {
       "credits_100": {
         "name": "入門包",

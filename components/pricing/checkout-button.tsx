@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useLocale } from "next-intl";
+import { useCallback, useState } from "react";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { useLocale, useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  CheckoutError,
+  createCheckoutSession,
+} from "@/lib/checkout-client";
 import type { PlanId } from "@/lib/stripe-plans";
 import { cn } from "@/lib/utils";
 
@@ -15,37 +20,6 @@ type CheckoutButtonProps = {
   size?: "default" | "sm" | "lg";
 };
 
-async function parseCheckoutResponse(res: Response) {
-  const contentType = res.headers.get("content-type") ?? "";
-
-  if (contentType.includes("application/json")) {
-    return (await res.json()) as {
-      ok?: boolean;
-      url?: string;
-      error?: string;
-    };
-  }
-
-  const text = await res.text();
-  if (text.trimStart().startsWith("<")) {
-    throw new Error(
-      res.status === 401
-        ? "Please sign in before purchasing"
-        : `Server returned HTML instead of JSON (${res.status}). Check API route and env vars on Vercel.`
-    );
-  }
-
-  try {
-    return JSON.parse(text) as {
-      ok?: boolean;
-      url?: string;
-      error?: string;
-    };
-  } catch {
-    throw new Error(`Unexpected response (${res.status}): ${text.slice(0, 120)}`);
-  }
-}
-
 export function CheckoutButton({
   planId,
   children,
@@ -54,46 +28,77 @@ export function CheckoutButton({
   size = "default",
 }: CheckoutButtonProps) {
   const locale = useLocale();
+  const t = useTranslations("pricing.checkout");
+  const { isSignedIn, isLoaded, userId, getToken } = useAuth();
+  const { user, isLoaded: isUserLoaded } = useUser();
   const [loading, setLoading] = useState(false);
 
-  async function handleCheckout() {
+  const canCheckout =
+    isLoaded && isUserLoaded && isSignedIn && Boolean(userId ?? user?.id);
+
+  const handleCheckout = useCallback(async () => {
+    if (!isLoaded || !isUserLoaded) {
+      return;
+    }
+
+    if (!isSignedIn || !userId) {
+      alert(t("signInRequired"));
+      return;
+    }
+
     setLoading(true);
+
     try {
-      const res = await fetch("/api/create-checkout-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, locale }),
-        credentials: "include",
+      const { url } = await createCheckoutSession(planId, locale, getToken);
+      window.location.assign(url);
+    } catch (error) {
+      console.error("[checkout]", {
+        error,
+        userId,
+        planId,
+        locale,
       });
 
-      const data = await parseCheckoutResponse(res);
-
-      if (!res.ok || data.ok === false || !data.url) {
-        throw new Error(data.error ?? `Checkout failed (${res.status})`);
+      if (error instanceof CheckoutError) {
+        if (error.code === "NO_TOKEN") {
+          alert(t("tokenError"));
+        } else if (error.code === "NOT_SIGNED_IN") {
+          alert(t("signInRequired"));
+        } else {
+          alert(error.message || t("failed"));
+        }
+      } else {
+        alert(
+          error instanceof Error ? error.message : t("failed")
+        );
       }
 
-      window.location.href = data.url;
-    } catch (error) {
-      console.error("[checkout]", error);
-      alert(
-        error instanceof Error ? error.message : "Unable to start checkout"
-      );
       setLoading(false);
     }
-  }
+  }, [
+    isLoaded,
+    isUserLoaded,
+    isSignedIn,
+    userId,
+    planId,
+    locale,
+    getToken,
+    t,
+  ]);
 
   return (
     <Button
       variant={variant}
       size={size}
       className={cn("w-full gap-1.5", className)}
-      disabled={loading}
+      disabled={loading || !canCheckout}
       onClick={handleCheckout}
+      aria-busy={loading}
     >
       {loading ? (
         <>
-          <Loader2 className="h-4 w-4 animate-spin" />
-          …
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          {t("processing")}
         </>
       ) : (
         children
