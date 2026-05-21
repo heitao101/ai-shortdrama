@@ -17,7 +17,7 @@ export default async function HomePage({ params }: Props) {
 
   return (
     <>
-      {/* 首页：粉紫流动背景 + 竖版封面横滑轮播（仅图片，见 HomeClient） */}
+      {/* 首页：生成器（剧本 / 参考图 / 时长 / 生成）与预览，见 HomeClient */}
       <HomeClient />
     </>
   );

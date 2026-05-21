@@ -1,4 +1,5 @@
 import type { DramaStyleId } from "@/lib/constants";
+import type { VideoDurationSeconds } from "@/lib/video-duration";
 import { getClerkSessionToken } from "@/lib/checkout-client";
 
 export type GenerateApiResponse = {
@@ -9,6 +10,7 @@ export type GenerateApiResponse = {
   durationSeconds?: number;
   mode?: "text-to-video" | "image-to-video";
   creditsDeducted?: number;
+  creditsRefunded?: number;
   creditsRemaining?: number;
   creditsRequired?: number;
   error?: string;
@@ -75,7 +77,7 @@ export async function requestVideoGeneration(
     prompt: string;
     style: DramaStyleId;
     images: Array<{ file: File; base64?: string }>;
-    duration?: number;
+    duration: VideoDurationSeconds;
   },
   getToken: GetTokenFn
 ): Promise<GenerateApiResponse> {

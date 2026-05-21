@@ -8,13 +8,26 @@ export type UserCreditsMeta = {
   isPro: boolean;
 };
 
-export function parseCreditsMetadata(
-  publicMetadata: Record<string, unknown> | undefined
-): UserCreditsMeta {
+export function parseCreditsFromMetadata(
+  metadata: Record<string, unknown> | undefined
+): Pick<UserCreditsMeta, "credits"> {
   const credits =
-    typeof publicMetadata?.[CREDITS_METADATA_KEY] === "number"
-      ? publicMetadata[CREDITS_METADATA_KEY]
+    typeof metadata?.[CREDITS_METADATA_KEY] === "number"
+      ? metadata[CREDITS_METADATA_KEY]
       : 0;
+  return { credits: Math.max(0, credits) };
+}
+
+export function parseCreditsMetadata(
+  publicMetadata: Record<string, unknown> | undefined,
+  privateMetadata?: Record<string, unknown> | undefined
+): UserCreditsMeta {
+  const privateCredits = parseCreditsFromMetadata(privateMetadata).credits;
+  const publicCredits = parseCreditsFromMetadata(publicMetadata).credits;
+  const hasPrivateCredits =
+    typeof privateMetadata?.[CREDITS_METADATA_KEY] === "number";
+  const credits = hasPrivateCredits ? privateCredits : publicCredits;
+
   const isPro =
     typeof publicMetadata?.[IS_PRO_METADATA_KEY] === "boolean"
       ? publicMetadata[IS_PRO_METADATA_KEY]

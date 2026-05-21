@@ -1,24 +1,35 @@
+import { createHmac } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/api-auth";
 import type { DramaStyleId } from "@/lib/constants";
 import { DRAMA_STYLES } from "@/lib/constants";
 import {
+  addUserCredits,
   deductUserCredits,
   getUserCredits,
   InsufficientCreditsError,
 } from "@/lib/credits";
-import { VIDEO_GENERATION_CREDIT_COST } from "@/lib/generation-cost";
-import { getKlingCredentials } from "@/lib/kling-client";
 import {
-  generateDramaVideo,
-  type ReferenceImageInput,
-} from "@/lib/video-generation";
+  getCreditCostForDurationValue,
+  CREDIT_COST_BY_DURATION,
+} from "@/lib/generation-cost";
+import { buildVideoPrompt } from "@/lib/video-prompt";
+import {
+  DEFAULT_VIDEO_DURATION,
+  parseVideoDuration,
+  VIDEO_DURATION_OPTIONS,
+} from "@/lib/video-duration";
+import { DEFAULT_ASPECT_RATIO } from "@/lib/video-models";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Vercel Hobby: max 300s. If generation times out, use a shorter prompt or split into segments.
 export const maxDuration = 300;
 
+const KLING_BASE_URL =
+  process.env.KLING_API_BASE_URL?.trim().replace(/\/$/, "") ||
+  "https://api.klingai.com";
+const POLL_INTERVAL_MS = 5000;
+const POLL_TIMEOUT_MS = 280_000;
 const MAX_REFERENCE_IMAGES = 6;
 const MIN_PROMPT_LENGTH = 10;
 
@@ -30,6 +41,11 @@ type RequestBody = {
   aspectRatio?: string;
 };
 
+type ReferenceImageInput = {
+  base64: string;
+  mimeType: string;
+};
+
 type ParsedGenerateRequest = {
   prompt: string;
   style: DramaStyleId;
@@ -37,6 +53,234 @@ type ParsedGenerateRequest = {
   duration?: number;
   aspectRatio?: "16:9" | "9:16";
 };
+
+type KlingApiEnvelope<T> = {
+  code: number;
+  message: string;
+  data?: T;
+};
+
+type KlingCreateTaskData = { task_id: string };
+type KlingTaskData = {
+  task_id: string;
+  task_status: string;
+  task_status_msg?: string;
+  task_result?: { videos?: Array<{ url?: string }> };
+};
+
+// ---------------------------------------------------------------------------
+// Kling official JWT auth (HS256) — new token for each API call
+// iss = Access Key, signed with Secret Key
+// ---------------------------------------------------------------------------
+
+function createKlingJwt(accessKey: string, secretKey: string): string {
+  const now = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(
+    JSON.stringify({ alg: "HS256", typ: "JWT" })
+  ).toString("base64url");
+  const payload = Buffer.from(
+    JSON.stringify({
+      iss: accessKey,
+      exp: now + 1800,
+      nbf: now - 5,
+    })
+  ).toString("base64url");
+  const signingInput = `${header}.${payload}`;
+  const signature = createHmac("sha256", secretKey)
+    .update(signingInput)
+    .digest("base64url");
+  return `${signingInput}.${signature}`;
+}
+
+function getKlingCredentials() {
+  const accessKey = process.env.KLING_ACCESS_KEY?.trim();
+  const secretKey = process.env.KLING_SECRET_KEY?.trim();
+  if (!accessKey || !secretKey) return null;
+  return { accessKey, secretKey };
+}
+
+function sdkIdToApiModelName(id: string): string {
+  let name = id.replace(/-(t2v|i2v)$/i, "");
+  name = name.replace(/\.0$/, "");
+  return name.replace(/\./g, "-");
+}
+
+function resolveModelName(mode: "text-to-video" | "image-to-video"): string {
+  const env =
+    mode === "text-to-video"
+      ? process.env.KLING_MODEL_T2V?.trim()
+      : process.env.KLING_MODEL_I2V?.trim();
+  if (env) return sdkIdToApiModelName(env);
+  const fallback = process.env.KLING_MODEL_NAME?.trim();
+  if (fallback) return sdkIdToApiModelName(fallback);
+  return "kling-v2-6";
+}
+
+function assertKlingOk<T>(body: KlingApiEnvelope<T>, context: string): T {
+  if (body.code !== 0) {
+    throw new Error(
+      body.message
+        ? `Kling API ${context}: ${body.message} (code ${body.code})`
+        : `Kling API ${context} failed (code ${body.code})`
+    );
+  }
+  if (body.data == null) {
+    throw new Error(`Kling API ${context}: empty response data`);
+  }
+  return body.data;
+}
+
+async function klingRequest<T>(
+  path: string,
+  init?: RequestInit
+): Promise<KlingApiEnvelope<T>> {
+  const credentials = getKlingCredentials();
+  if (!credentials) {
+    throw new Error("KLING_ACCESS_KEY and KLING_SECRET_KEY are not configured");
+  }
+
+  const token = createKlingJwt(credentials.accessKey, credentials.secretKey);
+  const res = await fetch(`${KLING_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...(init?.headers ?? {}),
+    },
+    cache: "no-store",
+  });
+
+  const text = await res.text();
+  let body: KlingApiEnvelope<T>;
+  try {
+    body = JSON.parse(text) as KlingApiEnvelope<T>;
+  } catch {
+    throw new Error(
+      `Kling API invalid JSON (${res.status}): ${text.slice(0, 200)}`
+    );
+  }
+
+  if (!res.ok && body.code === undefined) {
+    throw new Error(
+      `Kling API HTTP ${res.status}: ${body.message ?? text.slice(0, 200)}`
+    );
+  }
+
+  return body;
+}
+
+async function pollTask(
+  endpoint: "/v1/videos/text2video" | "/v1/videos/image2video",
+  taskId: string
+): Promise<KlingTaskData> {
+  const started = Date.now();
+
+  while (Date.now() - started < POLL_TIMEOUT_MS) {
+    const data = assertKlingOk<KlingTaskData>(
+      await klingRequest<KlingTaskData>(`${endpoint}/${taskId}`, {
+        method: "GET",
+      }),
+      "poll"
+    );
+
+    if (data.task_status === "succeed") return data;
+    if (data.task_status === "failed") {
+      throw new Error(data.task_status_msg ?? "Kling generation failed");
+    }
+
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+  }
+
+  throw new Error("Kling video generation timed out");
+}
+
+async function generateKlingVideo(input: {
+  prompt: string;
+  style: DramaStyleId;
+  images: ReferenceImageInput[];
+  duration?: number;
+  aspectRatio?: "16:9" | "9:16";
+}) {
+  const images = input.images;
+  const mode: "text-to-video" | "image-to-video" =
+    images.length === 0 ? "text-to-video" : "image-to-video";
+  const duration = input.duration ?? DEFAULT_VIDEO_DURATION;
+  const aspectRatio = input.aspectRatio ?? DEFAULT_ASPECT_RATIO;
+  const fullPrompt = buildVideoPrompt(input.prompt, input.style, {
+    hasReferenceImages: images.length > 0,
+    referenceCount: images.length,
+  });
+  const modelName = resolveModelName(mode);
+  const negativePrompt =
+    "blurry, low quality, watermark, text, logo, deformed face, distorted hands";
+
+  if (mode === "text-to-video") {
+    const created = assertKlingOk<KlingCreateTaskData>(
+      await klingRequest<KlingCreateTaskData>("/v1/videos/text2video", {
+        method: "POST",
+        body: JSON.stringify({
+          model_name: modelName,
+          prompt: fullPrompt,
+          negative_prompt: negativePrompt,
+          mode: "pro",
+          aspect_ratio: aspectRatio,
+          duration: String(duration),
+        }),
+      }),
+      "text2video"
+    );
+
+    const task = await pollTask("/v1/videos/text2video", created.task_id);
+    const videoUrl = task.task_result?.videos?.[0]?.url;
+    if (!videoUrl) throw new Error("No video URL in Kling response");
+
+    return {
+      videoUrl,
+      taskId: created.task_id,
+      model: modelName,
+      durationSeconds: duration,
+      mode,
+    };
+  }
+
+  const primary = images[0];
+  if (!primary) {
+    throw new Error("At least one reference image is required");
+  }
+
+  const imageBase64 = primary.base64.replace(/^data:[^;]+;base64,/, "");
+
+  const created = assertKlingOk<KlingCreateTaskData>(
+    await klingRequest<KlingCreateTaskData>("/v1/videos/image2video", {
+      method: "POST",
+      body: JSON.stringify({
+        model_name: modelName,
+        prompt: fullPrompt.slice(0, 2500),
+        negative_prompt: negativePrompt,
+        mode: "pro",
+        image: imageBase64,
+        duration: String(duration),
+      }),
+    }),
+    "image2video"
+  );
+
+  const task = await pollTask("/v1/videos/image2video", created.task_id);
+  const videoUrl = task.task_result?.videos?.[0]?.url;
+  if (!videoUrl) throw new Error("No video URL in Kling response");
+
+  return {
+    videoUrl,
+    taskId: created.task_id,
+    model: modelName,
+    durationSeconds: duration,
+    mode,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// HTTP handlers
+// ---------------------------------------------------------------------------
 
 function jsonResponse(body: Record<string, unknown>, status: number) {
   return new NextResponse(JSON.stringify(body), {
@@ -53,14 +297,8 @@ function isValidStyle(style: string): style is DramaStyleId {
   return DRAMA_STYLES.some((s) => s.id === style);
 }
 
-function parseDuration(value: unknown): number | undefined {
-  const n =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number(value)
-        : NaN;
-  return Number.isFinite(n) && n >= 3 && n <= 15 ? n : undefined;
+function parseDuration(value: unknown) {
+  return parseVideoDuration(value);
 }
 
 function parseAspectRatio(value: unknown): "16:9" | "9:16" | undefined {
@@ -69,7 +307,6 @@ function parseAspectRatio(value: unknown): "16:9" | "9:16" | undefined {
 
 function parseImagesFromJson(raw: RequestBody["images"]): ReferenceImageInput[] {
   if (!Array.isArray(raw)) return [];
-
   return raw
     .filter((item) => typeof item?.base64 === "string" && item.base64.length > 0)
     .slice(0, MAX_REFERENCE_IMAGES)
@@ -100,10 +337,7 @@ async function parseMultipartRequest(
   const prompt = String(form.get("prompt") ?? "").trim();
   const styleRaw = String(form.get("style") ?? "hongkong").trim();
   const style = isValidStyle(styleRaw) ? styleRaw : null;
-
-  if (!style) {
-    return { error: "Invalid visual style", status: 400 };
-  }
+  if (!style) return { error: "Invalid visual style", status: 400 };
 
   const files = [
     ...form.getAll("images"),
@@ -151,11 +385,9 @@ async function parseGenerateRequest(
   request: NextRequest
 ): Promise<ParsedGenerateRequest | { error: string; status: number }> {
   const contentType = request.headers.get("content-type") ?? "";
-
   if (contentType.includes("multipart/form-data")) {
     return parseMultipartRequest(request);
   }
-
   return parseJsonRequest(request);
 }
 
@@ -164,10 +396,12 @@ export async function GET() {
     {
       ok: true,
       service: "drama-video-generate",
-      provider: "kling-official",
-      models: ["kling-v2.6-t2v", "kling-v2.6-i2v"],
-      creditCost: VIDEO_GENERATION_CREDIT_COST,
-      accepts: ["application/json", "multipart/form-data"],
+      provider: "kling-official-jwt",
+      apiBase: KLING_BASE_URL,
+      models: ["kling-v2-6 (text2video / image2video)"],
+      creditCostByDuration: CREDIT_COST_BY_DURATION,
+      durationOptions: [...VIDEO_DURATION_OPTIONS],
+      defaultDuration: DEFAULT_VIDEO_DURATION,
       maxDurationSeconds: maxDuration,
     },
     200
@@ -213,17 +447,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const durationSeconds = duration ?? DEFAULT_VIDEO_DURATION;
+  const creditCost = getCreditCostForDurationValue(durationSeconds);
+
   let creditsBefore: Awaited<ReturnType<typeof getUserCredits>>;
   try {
     creditsBefore = await getUserCredits(userId);
-    if (creditsBefore.credits < VIDEO_GENERATION_CREDIT_COST) {
+    if (creditsBefore.credits < creditCost) {
       return jsonResponse(
         {
           ok: false,
           error: "Insufficient credits",
-          hint: "Purchase a credit pack on the pricing page to continue generating",
-          creditsRequired: VIDEO_GENERATION_CREDIT_COST,
+          hint: "Purchase credits on the pricing page",
+          creditsRequired: creditCost,
           creditsRemaining: creditsBefore.credits,
+          duration: durationSeconds,
         },
         402
       );
@@ -234,19 +472,36 @@ export async function POST(request: NextRequest) {
     return jsonResponse({ ok: false, error: message }, 500);
   }
 
+  let creditsAfterDeduct: Awaited<ReturnType<typeof deductUserCredits>>;
   try {
-    const result = await generateDramaVideo({
+    creditsAfterDeduct = await deductUserCredits(userId, creditCost);
+  } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: "Insufficient credits",
+          hint: "Purchase credits on the pricing page",
+          creditsRequired: error.required,
+          creditsRemaining: error.available,
+          duration: durationSeconds,
+        },
+        402
+      );
+    }
+    const message =
+      error instanceof Error ? error.message : "Failed to deduct credits";
+    return jsonResponse({ ok: false, error: message }, 500);
+  }
+
+  try {
+    const result = await generateKlingVideo({
       prompt,
       style,
       images,
-      duration,
+      duration: durationSeconds,
       aspectRatio,
     });
-
-    const creditsAfter = await deductUserCredits(
-      userId,
-      VIDEO_GENERATION_CREDIT_COST
-    );
 
     return jsonResponse(
       {
@@ -255,19 +510,26 @@ export async function POST(request: NextRequest) {
         taskId: result.taskId,
         model: result.model,
         durationSeconds: result.durationSeconds,
-        mode: images.length === 0 ? "text-to-video" : "image-to-video",
-        creditsDeducted: VIDEO_GENERATION_CREDIT_COST,
-        creditsRemaining: creditsAfter.credits,
+        mode: result.mode,
+        creditsDeducted: creditCost,
+        creditsRemaining: creditsAfterDeduct.credits,
       },
       200
     );
   } catch (error) {
+    try {
+      await addUserCredits(userId, creditCost);
+    } catch (refundError) {
+      console.error("[api/generate] Credit refund failed", refundError);
+    }
+
+    const refunded = await getUserCredits(userId);
+
     if (error instanceof InsufficientCreditsError) {
       return jsonResponse(
         {
           ok: false,
           error: "Insufficient credits",
-          hint: "Purchase a credit pack on the pricing page to continue generating",
           creditsRequired: error.required,
           creditsRemaining: error.available,
         },
@@ -278,18 +540,17 @@ export async function POST(request: NextRequest) {
     const message =
       error instanceof Error ? error.message : "Video generation failed";
     console.error("[api/generate]", message, error);
-    const isTimeout =
-      /timeout|timed out|deadline|504|FUNCTION_INVOCATION_TIMEOUT/i.test(
-        message
-      );
+    const isTimeout = /timeout|timed out/i.test(message);
+
     return jsonResponse(
       {
         ok: false,
         error: message,
         hint: isTimeout
-          ? "Generation timed out. Try a shorter prompt, fewer images, or split into shorter segments."
-          : "Check KLING_ACCESS_KEY / KLING_SECRET_KEY and your Kling account balance",
-        creditsRemaining: creditsBefore.credits,
+          ? "Try a shorter prompt or fewer reference images. Credits were refunded."
+          : "Generation failed. Credits were refunded. Check Kling API keys and balance.",
+        creditsRemaining: refunded.credits,
+        creditsRefunded: creditCost,
       },
       500
     );

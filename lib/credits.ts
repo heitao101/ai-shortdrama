@@ -18,6 +18,12 @@ export {
   type UserCreditsMeta,
 } from "@/lib/credits-meta";
 
+export {
+  CREDIT_COST_BY_DURATION,
+  getCreditCostForDuration,
+  getCreditCostForDurationValue,
+} from "@/lib/generation-cost";
+
 const MAX_PROCESSED_EVENTS = 200;
 
 function getClerk() {
@@ -28,16 +34,39 @@ function getClerk() {
   return createClerkClient({ secretKey });
 }
 
+/** Credits live in privateMetadata; publicMetadata is synced for client UI. */
+async function persistUserCredits(
+  userId: string,
+  credits: number,
+  isPro: boolean
+): Promise<UserCreditsMeta> {
+  const clerk = getClerk();
+  const user = await clerk.users.getUser(userId);
+
+  await clerk.users.updateUserMetadata(userId, {
+    privateMetadata: {
+      ...(user.privateMetadata ?? {}),
+      [CREDITS_METADATA_KEY]: credits,
+    },
+    publicMetadata: {
+      ...(user.publicMetadata ?? {}),
+      [CREDITS_METADATA_KEY]: credits,
+      [IS_PRO_METADATA_KEY]: isPro,
+    },
+  });
+
+  return { credits, isPro };
+}
+
 export async function getUserCredits(userId: string): Promise<UserCreditsMeta> {
   const clerk = getClerk();
   const user = await clerk.users.getUser(userId);
-  return parseCreditsMetadata(user.publicMetadata as Record<string, unknown>);
+  return parseCreditsMetadata(
+    user.publicMetadata as Record<string, unknown>,
+    user.privateMetadata as Record<string, unknown>
+  );
 }
 
-/**
- * Returns true if this event was newly claimed (safe to fulfill).
- * Returns false if already processed (skip duplicate webhook delivery).
- */
 export async function claimStripeEvent(
   userId: string,
   eventKey: string
@@ -74,8 +103,6 @@ export class InsufficientCreditsError extends Error {
   }
 }
 
-export { VIDEO_GENERATION_CREDIT_COST } from "@/lib/generation-cost";
-
 export async function deductUserCredits(
   userId: string,
   amount: number
@@ -84,43 +111,22 @@ export async function deductUserCredits(
     return getUserCredits(userId);
   }
 
-  const clerk = getClerk();
   const current = await getUserCredits(userId);
 
   if (current.credits < amount) {
     throw new InsufficientCreditsError(amount, current.credits);
   }
 
-  const nextCredits = current.credits - amount;
-  const user = await clerk.users.getUser(userId);
-
-  await clerk.users.updateUserMetadata(userId, {
-    publicMetadata: {
-      ...(user.publicMetadata ?? {}),
-      [CREDITS_METADATA_KEY]: nextCredits,
-    },
-  });
-
-  return { credits: nextCredits, isPro: current.isPro };
+  return persistUserCredits(userId, current.credits - amount, current.isPro);
 }
 
 export async function addUserCredits(
   userId: string,
   amount: number
 ): Promise<UserCreditsMeta> {
-  const clerk = getClerk();
   const current = await getUserCredits(userId);
   const nextCredits = Math.max(0, current.credits + amount);
-  const user = await clerk.users.getUser(userId);
-
-  await clerk.users.updateUserMetadata(userId, {
-    publicMetadata: {
-      ...(user.publicMetadata ?? {}),
-      [CREDITS_METADATA_KEY]: nextCredits,
-    },
-  });
-
-  return { credits: nextCredits, isPro: current.isPro };
+  return persistUserCredits(userId, nextCredits, current.isPro);
 }
 
 export async function setUserProStatus(
@@ -128,23 +134,11 @@ export async function setUserProStatus(
   isPro: boolean,
   bonusCredits = 0
 ): Promise<UserCreditsMeta> {
-  const clerk = getClerk();
   const current = await getUserCredits(userId);
   const nextCredits = current.credits + bonusCredits;
-  const user = await clerk.users.getUser(userId);
-
-  await clerk.users.updateUserMetadata(userId, {
-    publicMetadata: {
-      ...(user.publicMetadata ?? {}),
-      [CREDITS_METADATA_KEY]: nextCredits,
-      [IS_PRO_METADATA_KEY]: isPro,
-    },
-  });
-
-  return { credits: nextCredits, isPro };
+  return persistUserCredits(userId, nextCredits, isPro);
 }
 
-/** Apply plan credits / Pro status after a successful Stripe payment */
 export async function fulfillPlanForUser(
   userId: string,
   planId: PlanId,
