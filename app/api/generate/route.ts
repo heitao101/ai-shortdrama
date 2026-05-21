@@ -3,14 +3,20 @@ import { resolveRequestAuth } from "@/lib/api-auth";
 import type { DramaStyleId } from "@/lib/constants";
 import { DRAMA_STYLES } from "@/lib/constants";
 import {
+  deductUserCredits,
+  getUserCredits,
+  InsufficientCreditsError,
+} from "@/lib/credits";
+import { VIDEO_GENERATION_CREDIT_COST } from "@/lib/generation-cost";
+import { getKlingCredentials } from "@/lib/kling-client";
+import {
   generateDramaVideo,
   type ReferenceImageInput,
 } from "@/lib/video-generation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Vercel Hobby: max 300s per function. If generation times out, use a shorter prompt,
-// fewer reference images, or split the story into shorter segments and generate separately.
+// Vercel Hobby: max 300s. If generation times out, use a shorter prompt or split into segments.
 export const maxDuration = 300;
 
 const MAX_REFERENCE_IMAGES = 6;
@@ -158,11 +164,9 @@ export async function GET() {
     {
       ok: true,
       service: "drama-video-generate",
-      models: [
-        "klingai/kling-v3.0-t2v",
-        "klingai/kling-v3.0-i2v",
-        "bytedance/seedance-v1.0-lite-i2v",
-      ],
+      provider: "kling-official",
+      models: ["kling-v2.6-t2v", "kling-v2.6-i2v"],
+      creditCost: VIDEO_GENERATION_CREDIT_COST,
       accepts: ["application/json", "multipart/form-data"],
       maxDurationSeconds: maxDuration,
     },
@@ -179,12 +183,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!process.env.AI_GATEWAY_API_KEY?.trim()) {
+  const userId = authResult.userId;
+
+  if (!getKlingCredentials()) {
     return jsonResponse(
       {
         ok: false,
-        error: "AI Gateway is not configured",
-        hint: "Set AI_GATEWAY_API_KEY in .env.local",
+        error: "Kling API is not configured",
+        hint: "Set KLING_ACCESS_KEY and KLING_SECRET_KEY in .env.local",
       },
       503
     );
@@ -207,6 +213,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let creditsBefore: Awaited<ReturnType<typeof getUserCredits>>;
+  try {
+    creditsBefore = await getUserCredits(userId);
+    if (creditsBefore.credits < VIDEO_GENERATION_CREDIT_COST) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: "Insufficient credits",
+          hint: "Purchase a credit pack on the pricing page to continue generating",
+          creditsRequired: VIDEO_GENERATION_CREDIT_COST,
+          creditsRemaining: creditsBefore.credits,
+        },
+        402
+      );
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to read credits";
+    return jsonResponse({ ok: false, error: message }, 500);
+  }
+
   try {
     const result = await generateDramaVideo({
       prompt,
@@ -216,6 +243,11 @@ export async function POST(request: NextRequest) {
       aspectRatio,
     });
 
+    const creditsAfter = await deductUserCredits(
+      userId,
+      VIDEO_GENERATION_CREDIT_COST
+    );
+
     return jsonResponse(
       {
         ok: true,
@@ -224,10 +256,25 @@ export async function POST(request: NextRequest) {
         model: result.model,
         durationSeconds: result.durationSeconds,
         mode: images.length === 0 ? "text-to-video" : "image-to-video",
+        creditsDeducted: VIDEO_GENERATION_CREDIT_COST,
+        creditsRemaining: creditsAfter.credits,
       },
       200
     );
   } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: "Insufficient credits",
+          hint: "Purchase a credit pack on the pricing page to continue generating",
+          creditsRequired: error.required,
+          creditsRemaining: error.available,
+        },
+        402
+      );
+    }
+
     const message =
       error instanceof Error ? error.message : "Video generation failed";
     console.error("[api/generate]", message, error);
@@ -241,7 +288,8 @@ export async function POST(request: NextRequest) {
         error: message,
         hint: isTimeout
           ? "Generation timed out. Try a shorter prompt, fewer images, or split into shorter segments."
-          : "Check AI_GATEWAY_API_KEY and model availability on your Vercel plan",
+          : "Check KLING_ACCESS_KEY / KLING_SECRET_KEY and your Kling account balance",
+        creditsRemaining: creditsBefore.credits,
       },
       500
     );

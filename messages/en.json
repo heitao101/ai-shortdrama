@@ -125,7 +125,8 @@
     "generate": "Generate short drama",
     "generating": "Generating…",
     "loadingHint": "AI is rendering your video. This usually takes 1–5 minutes — keep this tab open.",
-    "loadingSubtext": "Kling 3.0 is creating your clip from your script and reference images…",
+    "loadingSubtext": "Kling AI is creating your clip from your script and reference images…",
+    "creditCost": "Each generation uses {cost} credits",
     "errorTitle": "Generation failed",
     "errorDismiss": "Dismiss",
     "charCount": "{current} / {max} chars"

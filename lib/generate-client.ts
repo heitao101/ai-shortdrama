@@ -8,6 +8,9 @@ export type GenerateApiResponse = {
   model?: string;
   durationSeconds?: number;
   mode?: "text-to-video" | "image-to-video";
+  creditsDeducted?: number;
+  creditsRemaining?: number;
+  creditsRequired?: number;
   error?: string;
   hint?: string;
 };
@@ -15,7 +18,13 @@ export type GenerateApiResponse = {
 export class GenerateError extends Error {
   constructor(
     message: string,
-    readonly code: "NOT_SIGNED_IN" | "NO_TOKEN" | "API_ERROR" | "INVALID_RESPONSE"
+    readonly code:
+      | "NOT_SIGNED_IN"
+      | "NO_TOKEN"
+      | "API_ERROR"
+      | "INSUFFICIENT_CREDITS"
+      | "INVALID_RESPONSE",
+    readonly creditsRemaining?: number
   ) {
     super(message);
     this.name = "GenerateError";
@@ -98,11 +107,21 @@ export async function requestVideoGeneration(
 
   const data = await parseGenerateResponse(res);
 
+  if (res.status === 402 || data.error === "Insufficient credits") {
+    throw new GenerateError(
+      [data.error, data.hint].filter(Boolean).join(" — ") ||
+        "Insufficient credits",
+      "INSUFFICIENT_CREDITS",
+      data.creditsRemaining
+    );
+  }
+
   if (!res.ok || data.ok === false || !data.videoUrl) {
     const message = [data.error, data.hint].filter(Boolean).join(" — ");
     throw new GenerateError(
       message || `Generation failed (${res.status})`,
-      "API_ERROR"
+      "API_ERROR",
+      data.creditsRemaining
     );
   }
 

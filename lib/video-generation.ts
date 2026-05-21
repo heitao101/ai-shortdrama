@@ -1,5 +1,6 @@
 import { experimental_generateVideo as generateVideo } from "ai";
 import type { DramaStyleId } from "@/lib/constants";
+import { createKlingProvider } from "@/lib/kling-client";
 import { buildVideoPrompt } from "@/lib/video-prompt";
 import {
   DEFAULT_ASPECT_RATIO,
@@ -34,24 +35,28 @@ function stripDataUrlPrefix(data: string): string {
   return match ? match[1] : data;
 }
 
-function toBuffer(base64: string): Buffer {
-  return Buffer.from(stripDataUrlPrefix(base64), "base64");
+function toRawBase64(base64: string): string {
+  return stripDataUrlPrefix(base64);
 }
 
 function pickModel(images: ReferenceImageInput[]): VideoModelId {
   return images.length === 0 ? KLING_T2V : KLING_I2V;
 }
 
+function resolveModelId(model: VideoModelId): VideoModelId {
+  const t2v = process.env.KLING_MODEL_T2V?.trim();
+  const i2v = process.env.KLING_MODEL_I2V?.trim();
+  if (model === KLING_T2V && t2v) return t2v as VideoModelId;
+  if (model === KLING_I2V && i2v) return i2v as VideoModelId;
+  return model;
+}
+
 export async function generateDramaVideo(
   input: GenerateVideoInput
 ): Promise<GenerateVideoOutput> {
-  const gatewayKey = process.env.AI_GATEWAY_API_KEY?.trim();
-  if (!gatewayKey) {
-    throw new Error("AI_GATEWAY_API_KEY is not configured");
-  }
-
+  const kling = createKlingProvider();
   const images = input.images ?? [];
-  const model = pickModel(images);
+  const model = resolveModelId(pickModel(images));
   const duration = input.duration ?? DEFAULT_VIDEO_DURATION;
   const aspectRatio = input.aspectRatio ?? DEFAULT_ASPECT_RATIO;
   const fullPrompt = buildVideoPrompt(input.prompt, input.style, {
@@ -59,25 +64,22 @@ export async function generateDramaVideo(
     referenceCount: images.length,
   });
 
-  const headers = {
-    Authorization: `Bearer ${gatewayKey}`,
+  const pollTimeoutMs = 280_000;
+  const providerOptions = {
+    klingai: {
+      mode: "pro" as const,
+      pollIntervalMs: 5000,
+      pollTimeoutMs,
+    },
   };
 
-  if (model === KLING_T2V) {
+  if (model.endsWith("-t2v")) {
     const result = await generateVideo({
-      model: KLING_T2V,
+      model: kling.video(model),
       prompt: fullPrompt,
       aspectRatio,
       duration,
-      headers,
-      providerOptions: {
-        klingai: {
-          mode: "pro",
-          multiShot: true,
-          pollIntervalMs: 5000,
-          pollTimeoutMs: 280_000,
-        },
-      },
+      providerOptions,
     });
     return formatResult(result, model, duration);
   }
@@ -87,34 +89,17 @@ export async function generateDramaVideo(
     throw new Error("At least one reference image is required for image-to-video");
   }
 
-  const primaryBuffer = toBuffer(primary.base64);
-  const elementList =
-    images.length > 1
-      ? images.slice(1, 4).map((img) => ({
-          image: toBuffer(img.base64),
-        }))
-      : undefined;
-
   const result = await generateVideo({
-    model: KLING_I2V,
+    model: kling.video(model),
     prompt: {
-      image: primaryBuffer,
+      image: toRawBase64(primary.base64),
       text: fullPrompt.slice(0, 2500),
     },
-    aspectRatio,
     duration,
-    headers,
-    providerOptions: {
-      klingai: {
-        mode: "pro",
-        pollIntervalMs: 5000,
-        pollTimeoutMs: 280_000,
-        ...(elementList ? { elementList } : {}),
-      },
-    } as unknown as Parameters<typeof generateVideo>[0]["providerOptions"],
+    providerOptions,
   });
 
-  return formatResult(result, KLING_I2V, duration);
+  return formatResult(result, model, duration);
 }
 
 function formatResult(
@@ -122,9 +107,33 @@ function formatResult(
   model: VideoModelId,
   durationSeconds: number
 ): GenerateVideoOutput {
+  const urlCandidate = result.videos[0] as
+    | { type?: string; url?: string }
+    | undefined;
+
+  if (
+    urlCandidate?.type === "url" &&
+    typeof urlCandidate.url === "string" &&
+    urlCandidate.url.length > 0
+  ) {
+    const videoUrl = urlCandidate.url;
+    const meta = result.providerMetadata as Record<string, unknown> | undefined;
+    const klingMeta = meta?.klingai as Record<string, unknown> | undefined;
+    const taskId =
+      (klingMeta?.taskId as string | undefined) ??
+      (klingMeta?.task_id as string | undefined);
+
+    return {
+      videoUrl,
+      model,
+      taskId,
+      durationSeconds,
+    };
+  }
+
   const file = result.videos[0] ?? result.video;
   if (!file) {
-    throw new Error("No video returned from the model");
+    throw new Error("No video returned from Kling API");
   }
 
   const bytes =
@@ -134,15 +143,20 @@ function formatResult(
         ? Buffer.from(file.base64, "base64")
         : null;
 
-  if (!bytes || bytes.length === 0) {
+  if (!bytes) {
+    throw new Error("Generated video data is empty");
+  }
+  const byteLength = bytes instanceof Buffer ? bytes.length : bytes.byteLength;
+  if (byteLength === 0) {
     throw new Error("Generated video data is empty");
   }
 
   const mediaType =
     ("mediaType" in file && file.mediaType) || "video/mp4";
   const base64 =
-    bytes instanceof Buffer ? bytes.toString("base64") : Buffer.from(bytes).toString("base64");
-  const videoUrl = `data:${mediaType};base64,${base64}`;
+    bytes instanceof Buffer
+      ? bytes.toString("base64")
+      : Buffer.from(bytes).toString("base64");
 
   const meta = result.providerMetadata as Record<string, unknown> | undefined;
   const klingMeta = meta?.klingai as Record<string, unknown> | undefined;
@@ -151,7 +165,7 @@ function formatResult(
     (klingMeta?.task_id as string | undefined);
 
   return {
-    videoUrl,
+    videoUrl: `data:${mediaType};base64,${base64}`,
     model,
     taskId,
     durationSeconds,

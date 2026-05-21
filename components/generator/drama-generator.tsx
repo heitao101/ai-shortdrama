@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { useTranslations } from "next-intl";
 import { GenerateAction } from "./generate-action";
 import { StoryInput } from "./story-input";
 import { ImageUpload, type ReferenceImage } from "./image-upload";
@@ -9,7 +10,8 @@ import { StyleSelector } from "./style-selector";
 import { GenerationLoading } from "@/components/ui/generation-loading";
 import { GenerationError } from "@/components/ui/generation-error";
 import type { DramaStyleId } from "@/lib/constants";
-import { requestVideoGeneration } from "@/lib/generate-client";
+import { VIDEO_GENERATION_CREDIT_COST } from "@/lib/generation-cost";
+import { GenerateError, requestVideoGeneration } from "@/lib/generate-client";
 import { cn } from "@/lib/utils";
 
 export type GeneratedVideoResult = {
@@ -18,6 +20,7 @@ export type GeneratedVideoResult = {
   model?: string;
   durationSeconds?: number;
   mode?: "text-to-video" | "image-to-video";
+  creditsRemaining?: number;
 };
 
 type DramaGeneratorProps = {
@@ -31,7 +34,9 @@ export function DramaGenerator({
   onGeneratingChange,
   className,
 }: DramaGeneratorProps) {
+  const t = useTranslations("generator");
   const { getToken } = useAuth();
+  const { user } = useUser();
   const [story, setStory] = useState("");
   const [images, setImages] = useState<ReferenceImage[]>([]);
   const [style, setStyle] = useState<DramaStyleId>("hongkong");
@@ -63,10 +68,19 @@ export function DramaGenerator({
         model: data.model,
         durationSeconds: data.durationSeconds,
         mode: data.mode,
+        creditsRemaining: data.creditsRemaining,
       });
+
+      if (data.creditsRemaining != null) {
+        void user?.reload();
+      }
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Video generation failed";
+        err instanceof GenerateError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Video generation failed";
       setError(message);
     } finally {
       setIsGenerating(false);
@@ -99,6 +113,9 @@ export function DramaGenerator({
             isGenerating={isGenerating}
             onGenerate={handleGenerate}
           />
+          <p className="text-center text-xs text-muted-foreground">
+            {t("creditCost", { cost: VIDEO_GENERATION_CREDIT_COST })}
+          </p>
         </div>
       </div>
     </section>

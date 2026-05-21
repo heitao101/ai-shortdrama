@@ -125,7 +125,8 @@
     "generate": "一鍵生成短劇",
     "generating": "正在生成中…",
     "loadingHint": "AI 正在渲染影片，通常需要 1–5 分鐘，請勿關閉頁面",
-    "loadingSubtext": "Kling 3.0 正在根據你的劇本與參考圖生成短劇片段…",
+    "loadingSubtext": "Kling AI 正在根據你的劇本與參考圖生成短劇片段…",
+    "creditCost": "每次生成消耗 {cost} 信用點",
     "errorTitle": "生成失敗",
     "errorDismiss": "關閉",
     "charCount": "{current} / {max} 字"

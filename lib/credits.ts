@@ -64,6 +64,46 @@ export async function claimStripeEvent(
   return true;
 }
 
+export class InsufficientCreditsError extends Error {
+  constructor(
+    readonly required: number,
+    readonly available: number
+  ) {
+    super(`Insufficient credits: need ${required}, have ${available}`);
+    this.name = "InsufficientCreditsError";
+  }
+}
+
+export { VIDEO_GENERATION_CREDIT_COST } from "@/lib/generation-cost";
+
+export async function deductUserCredits(
+  userId: string,
+  amount: number
+): Promise<UserCreditsMeta> {
+  if (amount <= 0) {
+    return getUserCredits(userId);
+  }
+
+  const clerk = getClerk();
+  const current = await getUserCredits(userId);
+
+  if (current.credits < amount) {
+    throw new InsufficientCreditsError(amount, current.credits);
+  }
+
+  const nextCredits = current.credits - amount;
+  const user = await clerk.users.getUser(userId);
+
+  await clerk.users.updateUserMetadata(userId, {
+    publicMetadata: {
+      ...(user.publicMetadata ?? {}),
+      [CREDITS_METADATA_KEY]: nextCredits,
+    },
+  });
+
+  return { credits: nextCredits, isPro: current.isPro };
+}
+
 export async function addUserCredits(
   userId: string,
   amount: number
