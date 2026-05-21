@@ -1,0 +1,241 @@
+import { NextRequest, NextResponse } from "next/server";
+import { resolveRequestAuth } from "@/lib/api-auth";
+import type { DramaStyleId } from "@/lib/constants";
+import { DRAMA_STYLES } from "@/lib/constants";
+import {
+  generateDramaVideo,
+  type ReferenceImageInput,
+} from "@/lib/video-generation";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+/** Video generation can take several minutes */
+export const maxDuration = 600;
+
+const MAX_REFERENCE_IMAGES = 6;
+const MIN_PROMPT_LENGTH = 10;
+
+type RequestBody = {
+  prompt?: string;
+  style?: string;
+  images?: Array<{ base64: string; mimeType?: string }>;
+  duration?: number;
+  aspectRatio?: string;
+};
+
+type ParsedGenerateRequest = {
+  prompt: string;
+  style: DramaStyleId;
+  images: ReferenceImageInput[];
+  duration?: number;
+  aspectRatio?: "16:9" | "9:16";
+};
+
+function jsonResponse(body: Record<string, unknown>, status: number) {
+  return new NextResponse(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
+function isValidStyle(style: string): style is DramaStyleId {
+  return DRAMA_STYLES.some((s) => s.id === style);
+}
+
+function parseDuration(value: unknown): number | undefined {
+  const n =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : NaN;
+  return Number.isFinite(n) && n >= 3 && n <= 15 ? n : undefined;
+}
+
+function parseAspectRatio(value: unknown): "16:9" | "9:16" | undefined {
+  return value === "16:9" || value === "9:16" ? value : undefined;
+}
+
+function parseImagesFromJson(raw: RequestBody["images"]): ReferenceImageInput[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .filter((item) => typeof item?.base64 === "string" && item.base64.length > 0)
+    .slice(0, MAX_REFERENCE_IMAGES)
+    .map((item) => ({
+      base64: item.base64,
+      mimeType: item.mimeType ?? "image/jpeg",
+    }));
+}
+
+async function fileToReferenceImage(file: File): Promise<ReferenceImageInput> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  return {
+    base64: buffer.toString("base64"),
+    mimeType: file.type || "image/jpeg",
+  };
+}
+
+async function parseMultipartRequest(
+  request: NextRequest
+): Promise<ParsedGenerateRequest | { error: string; status: number }> {
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return { error: "Invalid multipart form data", status: 400 };
+  }
+
+  const prompt = String(form.get("prompt") ?? "").trim();
+  const styleRaw = String(form.get("style") ?? "hongkong").trim();
+  const style = isValidStyle(styleRaw) ? styleRaw : null;
+
+  if (!style) {
+    return { error: "Invalid visual style", status: 400 };
+  }
+
+  const files = [
+    ...form.getAll("images"),
+    ...form.getAll("image"),
+  ].filter((entry): entry is File => entry instanceof File && entry.size > 0);
+
+  const images = await Promise.all(
+    files.slice(0, MAX_REFERENCE_IMAGES).map(fileToReferenceImage)
+  );
+
+  return {
+    prompt,
+    style,
+    images,
+    duration: parseDuration(form.get("duration")),
+    aspectRatio: parseAspectRatio(form.get("aspectRatio")),
+  };
+}
+
+async function parseJsonRequest(
+  request: NextRequest
+): Promise<ParsedGenerateRequest | { error: string; status: number }> {
+  let body: RequestBody;
+  try {
+    body = (await request.json()) as RequestBody;
+  } catch {
+    return { error: "Invalid JSON body", status: 400 };
+  }
+
+  const styleRaw = body.style?.trim() ?? "hongkong";
+  if (!isValidStyle(styleRaw)) {
+    return { error: "Invalid visual style", status: 400 };
+  }
+
+  return {
+    prompt: body.prompt?.trim() ?? "",
+    style: styleRaw,
+    images: parseImagesFromJson(body.images),
+    duration: parseDuration(body.duration),
+    aspectRatio: parseAspectRatio(body.aspectRatio),
+  };
+}
+
+async function parseGenerateRequest(
+  request: NextRequest
+): Promise<ParsedGenerateRequest | { error: string; status: number }> {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  if (contentType.includes("multipart/form-data")) {
+    return parseMultipartRequest(request);
+  }
+
+  return parseJsonRequest(request);
+}
+
+export async function GET() {
+  return jsonResponse(
+    {
+      ok: true,
+      service: "drama-video-generate",
+      models: [
+        "klingai/kling-v3.0-t2v",
+        "klingai/kling-v3.0-i2v",
+        "bytedance/seedance-v1.0-lite-i2v",
+      ],
+      accepts: ["application/json", "multipart/form-data"],
+    },
+    200
+  );
+}
+
+export async function POST(request: NextRequest) {
+  const authResult = await resolveRequestAuth(request);
+  if (!authResult.userId) {
+    return jsonResponse(
+      { ok: false, error: "Unauthorized", hint: "Sign in to generate video" },
+      401
+    );
+  }
+
+  if (!process.env.AI_GATEWAY_API_KEY?.trim()) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "AI Gateway is not configured",
+        hint: "Set AI_GATEWAY_API_KEY in .env.local",
+      },
+      503
+    );
+  }
+
+  const parsed = await parseGenerateRequest(request);
+  if ("error" in parsed) {
+    return jsonResponse({ ok: false, error: parsed.error }, parsed.status);
+  }
+
+  const { prompt, style, images, duration, aspectRatio } = parsed;
+
+  if (prompt.length < MIN_PROMPT_LENGTH) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: `Prompt must be at least ${MIN_PROMPT_LENGTH} characters`,
+      },
+      400
+    );
+  }
+
+  try {
+    const result = await generateDramaVideo({
+      prompt,
+      style,
+      images,
+      duration,
+      aspectRatio,
+    });
+
+    return jsonResponse(
+      {
+        ok: true,
+        videoUrl: result.videoUrl,
+        taskId: result.taskId,
+        model: result.model,
+        durationSeconds: result.durationSeconds,
+        mode: images.length === 0 ? "text-to-video" : "image-to-video",
+      },
+      200
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Video generation failed";
+    console.error("[api/generate]", message, error);
+    return jsonResponse(
+      {
+        ok: false,
+        error: message,
+        hint: "Check AI_GATEWAY_API_KEY and model availability on your Vercel plan",
+      },
+      500
+    );
+  }
+}

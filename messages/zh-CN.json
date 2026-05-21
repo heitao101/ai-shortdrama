@@ -5,6 +5,7 @@
   },
   "nav": {
     "logo": "DramaAI",
+    "mainNav": "主导航",
     "features": "功能",
     "pricing": "定价",
     "gallery": "作品库",
@@ -104,6 +105,11 @@
       }
     }
   },
+  "carousel": {
+    "title": "热门短剧作品",
+    "subtitle": "用户精彩创作 · 左右滑动探索",
+    "swipeHint": "左右滑动查看更多"
+  },
   "hero": {
     "badge": "AI 短剧 · 全球首发",
     "title": "把你的故事瞬间变成专业短剧",
@@ -118,6 +124,10 @@
     "styleLabel": "视觉风格",
     "generate": "一键生成短剧",
     "generating": "正在生成中…",
+    "loadingHint": "AI 正在渲染视频，通常需要 1–5 分钟，请勿关闭页面",
+    "loadingSubtext": "Kling 3.0 正在根据你的剧本与参考图生成短剧片段…",
+    "errorTitle": "生成失败",
+    "errorDismiss": "关闭",
     "charCount": "{current} / {max} 字"
   },
   "styles": {
@@ -131,14 +141,12 @@
   "preview": {
     "title": "生成预览",
     "empty": "生成结果将在此展示",
-    "emptyHint": "分镜、视频片段与导出选项将出现在此区域",
-    "scene": "分镜 {index}",
-    "duration": "{seconds}s",
-    "status": {
-      "idle": "等待生成",
-      "processing": "AI 渲染中",
-      "done": "已完成"
-    }
+    "emptyHint": "点击「一键生成短剧」后，完成的视频将在此播放",
+    "videoUnsupported": "你的浏览器不支持视频播放",
+    "model": "模型",
+    "mode": "模式",
+    "taskId": "任务 ID",
+    "download": "下载视频"
   },
   "auth": {
     "signInTitle": "登录 - DramaAI",

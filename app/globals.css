@@ -91,4 +91,77 @@
   .page-canvas {
     @apply min-h-screen bg-background;
   }
+
+  /* Homepage cinematic dark shell (Jurilu-style) */
+  .home-cinema {
+    background-color: #0a0a0a;
+  }
+
+  .home-gradient-flow {
+    background: linear-gradient(
+      120deg,
+      #0f0a1a 0%,
+      #2d1b4e 18%,
+      #4c1d95 35%,
+      #1e1b4b 52%,
+      #312e81 68%,
+      #831843 82%,
+      #0f172a 100%
+    );
+    background-size: 400% 400%;
+    animation: home-gradient-shift 16s ease infinite;
+    opacity: 0.95;
+  }
+
+  @keyframes home-gradient-shift {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .home-orb {
+    animation: home-orb-float 14s ease-in-out infinite;
+  }
+
+  .home-orb-2 {
+    animation-delay: -4s;
+  }
+
+  .home-orb-3 {
+    animation-delay: -8s;
+  }
+
+  @keyframes home-orb-float {
+    0%,
+    100% {
+      transform: translate(0, 0) scale(1);
+    }
+    50% {
+      transform: translate(12px, -18px) scale(1.05);
+    }
+  }
+
+  .home-particle {
+    animation: home-particle-drift ease-in-out infinite;
+  }
+
+  @keyframes home-particle-drift {
+    0%,
+    100% {
+      opacity: 0.15;
+      transform: translateY(0);
+    }
+    50% {
+      opacity: 0.55;
+      transform: translateY(-12px);
+    }
+  }
+
+  .home-content-card {
+    @apply rounded-2xl border border-white/10 bg-card/95 p-6 text-foreground shadow-[0_20px_60px_-24px_rgba(0,0,0,0.6)] backdrop-blur-sm sm:p-8;
+  }
 }

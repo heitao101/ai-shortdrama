@@ -5,6 +5,7 @@
   },
   "nav": {
     "logo": "DramaAI",
+    "mainNav": "Main navigation",
     "features": "Features",
     "pricing": "Pricing",
     "gallery": "Gallery",
@@ -104,6 +105,11 @@
       }
     }
   },
+  "carousel": {
+    "title": "Popular Short Dramas",
+    "subtitle": "Creator highlights · swipe to explore",
+    "swipeHint": "Swipe for more"
+  },
   "hero": {
     "badge": "AI Short Drama · Now Live",
     "title": "Turn your story into a pro short drama—instantly",
@@ -118,6 +124,10 @@
     "styleLabel": "Visual style",
     "generate": "Generate short drama",
     "generating": "Generating…",
+    "loadingHint": "AI is rendering your video. This usually takes 1–5 minutes — keep this tab open.",
+    "loadingSubtext": "Kling 3.0 is creating your clip from your script and reference images…",
+    "errorTitle": "Generation failed",
+    "errorDismiss": "Dismiss",
     "charCount": "{current} / {max} chars"
   },
   "styles": {
@@ -131,14 +141,12 @@
   "preview": {
     "title": "Preview",
     "empty": "Your generated content will appear here",
-    "emptyHint": "Storyboards, video clips, and export options will show in this area",
-    "scene": "Scene {index}",
-    "duration": "{seconds}s",
-    "status": {
-      "idle": "Waiting",
-      "processing": "AI rendering",
-      "done": "Complete"
-    }
+    "emptyHint": "After you click Generate, your finished video will play here",
+    "videoUnsupported": "Your browser does not support video playback",
+    "model": "Model",
+    "mode": "Mode",
+    "taskId": "Task ID",
+    "download": "Download video"
   },
   "auth": {
     "signInTitle": "Sign in - DramaAI",

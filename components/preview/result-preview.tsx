@@ -1,66 +1,83 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Film, Play, Clock } from "lucide-react";
-import type { GeneratedScene } from "@/components/generator/drama-generator";
+import { Film, Download } from "lucide-react";
+import type { GeneratedVideoResult } from "@/components/generator/drama-generator";
+import { GenerationLoading } from "@/components/ui/generation-loading";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type ResultPreviewProps = {
-  scenes: GeneratedScene[];
+  result: GeneratedVideoResult | null;
+  isGenerating?: boolean;
   className?: string;
 };
 
-export function ResultPreview({ scenes, className }: ResultPreviewProps) {
+export function ResultPreview({
+  result,
+  isGenerating = false,
+  className,
+}: ResultPreviewProps) {
   const t = useTranslations("preview");
 
-  const isEmpty = scenes.length === 0;
+  const isEmpty = !result && !isGenerating;
 
   return (
     <section id="preview" className={cn("space-y-6", className)}>
       <h2 className="section-title">{t("title")}</h2>
 
-      {isEmpty ? (
+      {isGenerating ? (
+        <GenerationLoading variant="inline" />
+      ) : isEmpty ? (
         <div className="surface-muted flex min-h-[300px] flex-col items-center justify-center p-10 text-center">
           <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
             <Film className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="text-base font-medium text-foreground">
-            {t("empty")}
-          </p>
+          <p className="text-base font-medium text-foreground">{t("empty")}</p>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
             {t("emptyHint")}
           </p>
         </div>
-      ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {scenes.map((scene) => (
-            <article
-              key={scene.id}
-              className="group overflow-hidden rounded-2xl border border-border/70 bg-card shadow-card transition-shadow hover:shadow-card-hover"
+      ) : result ? (
+        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-card">
+          <div className="relative mx-auto aspect-[9/16] max-h-[min(70vh,720px)] w-full max-w-md bg-black">
+            <video
+              src={result.videoUrl}
+              controls
+              playsInline
+              className="h-full w-full object-contain"
+              poster=""
             >
-              <div className="relative aspect-[9/16] bg-muted/60">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-card shadow-soft ring-1 ring-border transition group-hover:scale-[1.02]">
-                    <Play className="ml-0.5 h-5 w-5 fill-brand-600 text-brand-600" />
-                  </div>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 border-t border-border/50 bg-card/95 p-3.5 backdrop-blur-sm">
-                  <p className="text-sm font-medium text-foreground">
-                    {t("scene", { index: scene.index })}
-                  </p>
-                  <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    {t("duration", { seconds: scene.duration })}
-                  </p>
-                </div>
-                <span className="absolute right-2.5 top-2.5 rounded-lg bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-600">
-                  {t(`status.${scene.status}`)}
-                </span>
-              </div>
-            </article>
-          ))}
+              {t("videoUnsupported")}
+            </video>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 p-4 sm:p-5">
+            <div className="space-y-1 text-sm">
+              {result.model ? (
+                <p className="text-muted-foreground">
+                  {t("model")}: <span className="text-foreground">{result.model}</span>
+                </p>
+              ) : null}
+              {result.mode ? (
+                <p className="text-muted-foreground">
+                  {t("mode")}: <span className="text-foreground">{result.mode}</span>
+                </p>
+              ) : null}
+              {result.taskId ? (
+                <p className="truncate text-xs text-muted-foreground">
+                  {t("taskId")}: {result.taskId}
+                </p>
+              ) : null}
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <a href={result.videoUrl} download="drama-ai-video.mp4">
+                <Download className="mr-2 h-4 w-4" />
+                {t("download")}
+              </a>
+            </Button>
+          </div>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

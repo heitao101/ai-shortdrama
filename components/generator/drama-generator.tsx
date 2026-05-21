@@ -1,55 +1,86 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { GenerateAction } from "./generate-action";
 import { StoryInput } from "./story-input";
 import { ImageUpload, type ReferenceImage } from "./image-upload";
 import { StyleSelector } from "./style-selector";
+import { GenerationLoading } from "@/components/ui/generation-loading";
+import { GenerationError } from "@/components/ui/generation-error";
 import type { DramaStyleId } from "@/lib/constants";
+import { requestVideoGeneration } from "@/lib/generate-client";
 import { cn } from "@/lib/utils";
 
-export type GeneratedScene = {
-  id: string;
-  index: number;
-  duration: number;
-  status: "processing" | "done";
+export type GeneratedVideoResult = {
+  videoUrl: string;
+  taskId?: string;
+  model?: string;
+  durationSeconds?: number;
+  mode?: "text-to-video" | "image-to-video";
 };
 
 type DramaGeneratorProps = {
-  onGenerate?: (scenes: GeneratedScene[]) => void;
+  onGenerate?: (result: GeneratedVideoResult) => void;
+  onGeneratingChange?: (isGenerating: boolean) => void;
   className?: string;
 };
 
-export function DramaGenerator({ onGenerate, className }: DramaGeneratorProps) {
+export function DramaGenerator({
+  onGenerate,
+  onGeneratingChange,
+  className,
+}: DramaGeneratorProps) {
+  const { getToken } = useAuth();
   const [story, setStory] = useState("");
   const [images, setImages] = useState<ReferenceImage[]>([]);
   const [style, setStyle] = useState<DramaStyleId>("hongkong");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const canGenerate = story.trim().length >= 20 && !isGenerating;
 
   async function handleGenerate() {
     if (!canGenerate) return;
 
+    setError(null);
     setIsGenerating(true);
-    await new Promise((r) => setTimeout(r, 2400));
+    onGeneratingChange?.(true);
 
-    const mockScenes: GeneratedScene[] = Array.from({ length: 4 }, (_, i) => ({
-      id: `scene-${i + 1}`,
-      index: i + 1,
-      duration: 8 + i * 2,
-      status: "done" as const,
-    }));
+    try {
+      const data = await requestVideoGeneration(
+        {
+          prompt: story.trim(),
+          style,
+          images: images.map((img) => ({ file: img.file })),
+        },
+        getToken
+      );
 
-    onGenerate?.(mockScenes);
-    setIsGenerating(false);
+      onGenerate?.({
+        videoUrl: data.videoUrl!,
+        taskId: data.taskId,
+        model: data.model,
+        durationSeconds: data.durationSeconds,
+        mode: data.mode,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Video generation failed";
+      setError(message);
+    } finally {
+      setIsGenerating(false);
+      onGeneratingChange?.(false);
+    }
   }
 
   return (
     <section
       id="generator"
-      className={cn("surface-card p-7 sm:p-9 lg:p-10", className)}
+      className={cn("surface-card relative p-7 sm:p-9 lg:p-10", className)}
     >
+      {isGenerating ? <GenerationLoading variant="overlay" /> : null}
+
       <div className="space-y-9">
         <StoryInput value={story} onChange={setStory} />
 
@@ -57,6 +88,10 @@ export function DramaGenerator({ onGenerate, className }: DramaGeneratorProps) {
           <ImageUpload images={images} onChange={setImages} />
           <StyleSelector value={style} onChange={setStyle} />
         </div>
+
+        {error ? (
+          <GenerationError message={error} onDismiss={() => setError(null)} />
+        ) : null}
 
         <div className="flex flex-col items-center gap-4 border-t border-border/60 pt-9">
           <GenerateAction

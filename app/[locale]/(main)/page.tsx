@@ -16,9 +16,9 @@ export default async function HomePage({ params }: Props) {
   }
 
   return (
-    <div className="page-canvas">
-      {/* Hero + generator live on soft gray canvas; content in white cards */}
+    <>
+      {/* 首页：粉紫流动背景 + 竖版封面横滑轮播（仅图片，见 HomeClient） */}
       <HomeClient />
-    </div>
+    </>
   );
 }
