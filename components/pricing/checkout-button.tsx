@@ -15,6 +15,37 @@ type CheckoutButtonProps = {
   size?: "default" | "sm" | "lg";
 };
 
+async function parseCheckoutResponse(res: Response) {
+  const contentType = res.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    return (await res.json()) as {
+      ok?: boolean;
+      url?: string;
+      error?: string;
+    };
+  }
+
+  const text = await res.text();
+  if (text.trimStart().startsWith("<")) {
+    throw new Error(
+      res.status === 401
+        ? "Please sign in before purchasing"
+        : `Server returned HTML instead of JSON (${res.status}). Check API route and env vars on Vercel.`
+    );
+  }
+
+  try {
+    return JSON.parse(text) as {
+      ok?: boolean;
+      url?: string;
+      error?: string;
+    };
+  } catch {
+    throw new Error(`Unexpected response (${res.status}): ${text.slice(0, 120)}`);
+  }
+}
+
 export function CheckoutButton({
   planId,
   children,
@@ -32,17 +63,18 @@ export function CheckoutButton({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planId, locale }),
+        credentials: "include",
       });
 
-      const data = (await res.json()) as { url?: string; error?: string };
+      const data = await parseCheckoutResponse(res);
 
-      if (!res.ok || !data.url) {
-        throw new Error(data.error ?? "Checkout failed");
+      if (!res.ok || data.ok === false || !data.url) {
+        throw new Error(data.error ?? `Checkout failed (${res.status})`);
       }
 
       window.location.href = data.url;
     } catch (error) {
-      console.error(error);
+      console.error("[checkout]", error);
       alert(
         error instanceof Error ? error.message : "Unable to start checkout"
       );

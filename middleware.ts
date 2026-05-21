@@ -2,20 +2,24 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import createIntlMiddleware from "next-intl/middleware";
 import { routing } from "./i18n/routing";
 
+/**
+ * next-intl middleware — ONLY for page routes.
+ * API routes (/api/*) are excluded via config.matcher below.
+ */
 const intlMiddleware = createIntlMiddleware(routing);
 
-/**
- * Public routes (no login required).
- * Paths are locale-agnostic — Clerk/next-intl matchers use :locale segment.
- */
+/** Page routes that do not require sign-in */
 const isPublicRoute = createRouteMatcher([
   "/",
   "/:locale",
   "/:locale/sign-in(.*)",
   "/:locale/sign-up(.*)",
-  "/api/webhook",
 ]);
 
+/**
+ * Middleware runs ONLY on app pages (see config.matcher).
+ * /api/* is never matched — no Clerk redirect, no next-intl locale redirect.
+ */
 export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     await auth.protect();
@@ -25,10 +29,9 @@ export default clerkMiddleware(async (auth, request) => {
 });
 
 export const config = {
-  matcher: [
-    // Skip Next.js internals and static files
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    // Always run for API routes
-    "/(api|trpc)(.*)",
-  ],
+  /**
+   * Explicit allowlist: localized pages + home.
+   * Deliberately omits /api, /trpc, /_next, static files.
+   */
+  matcher: ["/", "/(zh-CN|zh-HK|en)(/.*)?"],
 };
