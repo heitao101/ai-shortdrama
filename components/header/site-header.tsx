@@ -36,7 +36,7 @@ export function SiteHeader() {
             {t("gallery")}
           </Link>
           <Link
-            href="/#pricing"
+            href="/pricing"
             className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             {t("pricing")}

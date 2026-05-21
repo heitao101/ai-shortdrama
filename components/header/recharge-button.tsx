@@ -13,7 +13,8 @@ export function RechargeButton() {
   return (
     <SignedIn>
       <CheckoutButton
-        planId="credits_500"
+        plan="personal-monthly"
+        type="subscription"
         variant="outline"
         size="sm"
         className="hidden gap-1.5 sm:inline-flex sm:w-auto"
@@ -27,7 +28,7 @@ export function RechargeButton() {
         size="sm"
         className="inline-flex gap-1.5 sm:hidden"
       >
-        <Link href="/#pricing">
+        <Link href="/pricing">
           <Wallet className="h-4 w-4" />
           {t("recharge")}
         </Link>

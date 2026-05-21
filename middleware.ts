@@ -8,6 +8,7 @@ const intlMiddleware = createIntlMiddleware(routing);
 const isPublicRoute = createRouteMatcher([
   "/",
   "/:locale",
+  "/:locale/pricing",
   "/:locale/sign-in(.*)",
   "/:locale/sign-up(.*)",
 ]);

@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, getAuth } from "@clerk/nextjs/server";
 import Stripe from "stripe";
-import { getPlan, getPriceId, type PlanId } from "@/lib/stripe-plans";
+import {
+  ALL_PLAN_IDS,
+  getPlan,
+  getPriceId,
+  resolveCheckoutPlanId,
+  type StripePlan,
+} from "@/lib/stripe-plans";
 
 /** Isolated from next-intl — always returns JSON */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const VALID_PLAN_IDS: PlanId[] = ["credits_100", "credits_500", "pro_monthly"];
 const DEFAULT_LOCALE = "zh-HK";
 
 const AUTH_TOKEN_TYPES = ["session_token", "oauth_token"] as const;
 
 type RequestBody = {
+  plan?: string;
   planId?: string;
+  type?: "one-time" | "subscription";
   locale?: string;
 };
 
@@ -88,13 +95,6 @@ function createStripeClient(): Stripe {
   });
 }
 
-function isValidPlanId(value: string | undefined): value is PlanId {
-  return (
-    typeof value === "string" &&
-    (VALID_PLAN_IDS as string[]).includes(value)
-  );
-}
-
 function resolveLocale(value: string | undefined): string {
   if (value === "zh-CN" || value === "zh-HK" || value === "en") {
     return value;
@@ -115,6 +115,37 @@ async function parseBody(request: NextRequest): Promise<RequestBody | null> {
   } catch {
     return null;
   }
+}
+
+function buildLineItem(plan: StripePlan, priceId: string | undefined) {
+  if (priceId) {
+    return { price: priceId, quantity: 1 };
+  }
+
+  const recurring =
+    plan.type === "subscription"
+      ? {
+          interval:
+            plan.billingInterval === "year"
+              ? ("year" as const)
+              : ("month" as const),
+        }
+      : undefined;
+
+  return {
+    price_data: {
+      currency: plan.currency,
+      unit_amount: plan.amount,
+      product_data: {
+        name: `DramaAI — ${plan.id}`,
+        description: `${plan.credits} credits${
+          plan.type === "subscription" ? " per billing period" : ""
+        }`,
+      },
+      ...(recurring ? { recurring } : {}),
+    },
+    quantity: 1,
+  };
 }
 
 /**
@@ -240,11 +271,15 @@ export async function POST(request: NextRequest) {
       return jsonError("Invalid JSON body", 400);
     }
 
-    if (!isValidPlanId(body.planId)) {
-      return jsonError("Invalid plan", 400, { validPlans: VALID_PLAN_IDS });
+    const planId =
+      resolveCheckoutPlanId(body.plan ?? body.planId, body.type) ??
+      resolveCheckoutPlanId(body.plan ?? body.planId);
+
+    if (!planId) {
+      return jsonError("Invalid plan", 400, { validPlans: ALL_PLAN_IDS });
     }
 
-    const plan = getPlan(body.planId);
+    const plan = getPlan(planId);
     if (!plan) {
       return jsonError("Plan not found", 400);
     }
@@ -253,29 +288,7 @@ export async function POST(request: NextRequest) {
     const stripe = createStripeClient();
     const appUrl = getAppUrl();
     const priceId = getPriceId(plan);
-
-    const lineItem = priceId
-      ? { price: priceId, quantity: 1 }
-      : {
-          price_data: {
-            currency: plan.currency,
-            unit_amount: plan.amount,
-            product_data: {
-              name:
-                plan.type === "subscription"
-                  ? "DramaAI Pro (Monthly)"
-                  : `DramaAI Credits — ${plan.credits}`,
-              description:
-                plan.type === "subscription"
-                  ? `${plan.credits} credits per month + Pro features`
-                  : `${plan.credits} generation credits`,
-            },
-            ...(plan.type === "subscription"
-              ? { recurring: { interval: "month" as const } }
-              : {}),
-          },
-          quantity: 1,
-        };
+    const lineItem = buildLineItem(plan, priceId);
 
     const returnBase = `${appUrl}/${locale}`;
 
@@ -291,8 +304,8 @@ export async function POST(request: NextRequest) {
       mode: plan.type === "subscription" ? "subscription" : "payment",
       client_reference_id: userId,
       line_items: [lineItem],
-      success_url: `${returnBase}?checkout=success#pricing`,
-      cancel_url: `${returnBase}?checkout=canceled#pricing`,
+      success_url: `${returnBase}/pricing?checkout=success`,
+      cancel_url: `${returnBase}/pricing?checkout=canceled`,
       metadata: {
         userId,
         planId: plan.id,

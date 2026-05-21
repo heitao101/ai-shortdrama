@@ -1,5 +1,7 @@
 import type { PlanId } from "@/lib/stripe-plans";
 
+export type CheckoutPlanType = "one-time" | "subscription";
+
 export type CheckoutApiResponse = {
   ok?: boolean;
   url?: string;
@@ -47,7 +49,6 @@ async function parseCheckoutResponse(res: Response): Promise<CheckoutApiResponse
   }
 }
 
-/** Obtain a fresh Clerk session JWT for API authorization */
 export async function getClerkSessionToken(
   getToken: GetTokenFn
 ): Promise<string> {
@@ -67,12 +68,9 @@ export async function getClerkSessionToken(
   return token;
 }
 
-/**
- * Create a Stripe Checkout session via our API.
- * Sends Clerk Bearer token + cookies for maximum compatibility.
- */
 export async function createCheckoutSession(
-  planId: PlanId,
+  plan: PlanId,
+  type: CheckoutPlanType,
   locale: string,
   getToken: GetTokenFn
 ): Promise<{ url: string; sessionId?: string }> {
@@ -84,7 +82,7 @@ export async function createCheckoutSession(
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ planId, locale }),
+    body: JSON.stringify({ plan, type, locale }),
     credentials: "include",
     cache: "no-store",
   });

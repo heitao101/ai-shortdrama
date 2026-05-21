@@ -15,38 +15,92 @@
     "creditsLabel": "剩余信用点"
   },
   "pricing": {
+    "eyebrow": "定价方案",
+    "pageTitle": "选择适合你的创作方案",
+    "pageTitleEn": "Choose Your Creative Plan",
+    "pageSubtitle": "个人、专业、团队三种版本，7 款套餐灵活组合。Stripe 安全支付，支持全球信用卡。",
+    "pageSubtitleEn": "Personal, Professional & Team tiers — 7 flexible plans. Secure checkout via Stripe.",
     "title": "信用点充值",
-    "subtitle": "选择套餐，通过 Stripe 安全支付，支持香港及海外信用卡",
-    "popular": "最受欢迎",
+    "homeTeaser": "个人版、专业版、团队版共 7 款套餐，从入门到企业级一应俱全。",
+    "viewAllPlans": "查看完整定价",
+    "badgePopular": "最受欢迎",
+    "badgeBestValue": "最划算",
     "perMonth": "/ 月",
+    "perYear": "/ 年",
+    "perMonthCredits": "（每月）",
     "creditsIncluded": "含 {count} 信用点",
     "buyNow": "立即购买",
-    "subscribe": "订阅 Pro",
+    "subscribe": "立即订阅",
     "successMessage": "支付成功！信用点已入账，Header 余额将自动更新。",
     "canceledMessage": "已取消支付，可随时返回继续选购。",
-    "signInRequired": "请先登录后再充值",
-    "signInToPurchase": "登录购买",
+    "signInRequired": "购买前请先登录账号",
+    "signInToPurchase": "登录后购买",
     "checkout": {
       "signInRequired": "请先登录后再购买",
       "tokenError": "无法获取登录凭证，请重新登录后再试",
       "failed": "无法启动支付，请稍后再试",
       "processing": "跳转支付中…"
     },
+    "tiers": {
+      "personal": {
+        "title": "个人版",
+        "subtitle": "适合个人创作者与轻量试用",
+        "subtitleEn": "Personal — for solo creators"
+      },
+      "professional": {
+        "title": "专业版",
+        "subtitle": "适合全职创作者与高频产出",
+        "subtitleEn": "Professional — for power creators"
+      },
+      "team": {
+        "title": "团队版",
+        "subtitle": "适合工作室、MCN 与小型团队",
+        "subtitleEn": "Team — for studios & agencies"
+      }
+    },
     "plans": {
-      "credits_100": {
-        "name": "入门包",
-        "description": "适合初次体验",
-        "features": ["100 信用点", "单次购买", "支持 Visa / Mastercard"]
+      "starter": {
+        "name": "个人入门包",
+        "nameEn": "Personal Starter",
+        "description": "单次购买，轻松体验 AI 短剧",
+        "features": ["120 信用点", "单次购买，永不过期", "支持 Visa / Mastercard", "适合初次体验"]
       },
-      "credits_500": {
-        "name": "创作者包",
-        "description": "高性价比，适合频繁创作",
-        "features": ["500 信用点", "单次购买", "优先渲染队列"]
+      "personal-monthly": {
+        "name": "个人月订阅",
+        "nameEn": "Personal Monthly",
+        "description": "每月自动续费，稳定创作",
+        "features": ["每月 300 信用点", "自动每月续费", "优先渲染队列", "随时可取消"]
       },
-      "pro_monthly": {
-        "name": "Pro 月订阅",
-        "description": "每月自动续费，解锁 Pro 功能",
-        "features": ["每月 300 信用点", "Pro 标识", "优先客服支持"]
+      "pro-creator": {
+        "name": "专业创作者包",
+        "nameEn": "Pro Creator Pack",
+        "description": "单次大额充值，适合项目制创作",
+        "features": ["600 信用点", "单次购买", "高清导出优先", "专业风格模板"]
+      },
+      "pro-monthly": {
+        "name": "专业月订阅",
+        "nameEn": "Pro Monthly",
+        "description": "全职创作者首选方案",
+        "features": ["每月 1000 信用点", "Pro 创作者标识", "优先客服支持", "进阶分镜控制"]
+      },
+      "team-pack": {
+        "name": "团队大户包",
+        "nameEn": "Team Pack",
+        "description": "团队单次充值，快速补充额度",
+        "features": ["1800 信用点", "单次购买", "团队共享额度", "批量导出支持"]
+      },
+      "team-monthly": {
+        "name": "团队月订阅",
+        "nameEn": "Team Monthly",
+        "description": "工作室月度标准方案",
+        "features": ["每月 2500 信用点", "多人协作优先", "专属客服通道", "月度灵活续费"]
+      },
+      "team-yearly": {
+        "name": "团队年订阅",
+        "nameEn": "Team Yearly",
+        "description": "年度锁定最优单价",
+        "yearlyNote": "折合 $37.4/月 · 年度最优",
+        "features": ["每月 3000 信用点", "年度最优价格", "优先新功能体验", "专属客户成功经理"]
       }
     }
   },

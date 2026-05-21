@@ -15,38 +15,92 @@
     "creditsLabel": "剩餘信用點"
   },
   "pricing": {
+    "eyebrow": "定價方案",
+    "pageTitle": "選擇適合你的創作方案",
+    "pageTitleEn": "Choose Your Creative Plan",
+    "pageSubtitle": "個人、專業、團隊三種版本，7 款套餐靈活組合。Stripe 安全支付，支援全球信用卡。",
+    "pageSubtitleEn": "Personal, Professional & Team tiers — 7 flexible plans. Secure checkout via Stripe.",
     "title": "信用點充值",
-    "subtitle": "選擇套餐，透過 Stripe 安全支付，支援香港及海外信用卡",
-    "popular": "最受歡迎",
+    "homeTeaser": "個人版、專業版、團隊版共 7 款套餐，從入門到企業級一應俱全。",
+    "viewAllPlans": "查看完整定價",
+    "badgePopular": "最受歡迎",
+    "badgeBestValue": "最划算",
     "perMonth": "/ 月",
+    "perYear": "/ 年",
+    "perMonthCredits": "（每月）",
     "creditsIncluded": "含 {count} 信用點",
     "buyNow": "立即購買",
-    "subscribe": "訂閱 Pro",
+    "subscribe": "立即訂閱",
     "successMessage": "支付成功！信用點已入帳，Header 餘額將自動更新。",
     "canceledMessage": "已取消支付，可隨時返回繼續選購。",
-    "signInRequired": "請先登入後再充值",
-    "signInToPurchase": "登入購買",
+    "signInRequired": "購買前請先登入帳號",
+    "signInToPurchase": "登入後購買",
     "checkout": {
       "signInRequired": "請先登入後再購買",
       "tokenError": "無法取得登入憑證，請重新登入後再試",
       "failed": "無法啟動支付，請稍後再試",
       "processing": "跳轉支付中…"
     },
+    "tiers": {
+      "personal": {
+        "title": "個人版",
+        "subtitle": "適合個人創作者與輕量試用",
+        "subtitleEn": "Personal — for solo creators"
+      },
+      "professional": {
+        "title": "專業版",
+        "subtitle": "適合全職創作者與高頻產出",
+        "subtitleEn": "Professional — for power creators"
+      },
+      "team": {
+        "title": "團隊版",
+        "subtitle": "適合工作室、MCN 與小型團隊",
+        "subtitleEn": "Team — for studios & agencies"
+      }
+    },
     "plans": {
-      "credits_100": {
-        "name": "入門包",
-        "description": "適合初次體驗",
-        "features": ["100 信用點", "單次購買", "支援 Visa / Mastercard"]
+      "starter": {
+        "name": "個人入門包",
+        "nameEn": "Personal Starter",
+        "description": "單次購買，輕鬆體驗 AI 短劇",
+        "features": ["120 信用點", "單次購買，永不過期", "支援 Visa / Mastercard", "適合初次體驗"]
       },
-      "credits_500": {
-        "name": "創作者包",
-        "description": "高性價比，適合頻繁創作",
-        "features": ["500 信用點", "單次購買", "優先渲染佇列"]
+      "personal-monthly": {
+        "name": "個人月訂閱",
+        "nameEn": "Personal Monthly",
+        "description": "每月自動續費，穩定創作",
+        "features": ["每月 300 信用點", "自動每月續費", "優先渲染佇列", "隨時可取消"]
       },
-      "pro_monthly": {
-        "name": "Pro 月訂閱",
-        "description": "每月自動續費，解鎖 Pro 功能",
-        "features": ["每月 300 信用點", "Pro 標識", "優先客服支援"]
+      "pro-creator": {
+        "name": "專業創作者包",
+        "nameEn": "Pro Creator Pack",
+        "description": "單次大額充值，適合項目制創作",
+        "features": ["600 信用點", "單次購買", "高清匯出優先", "專業風格模板"]
+      },
+      "pro-monthly": {
+        "name": "專業月訂閱",
+        "nameEn": "Pro Monthly",
+        "description": "全職創作者首選方案",
+        "features": ["每月 1000 信用點", "Pro 創作者標識", "優先客服支援", "進階分鏡控制"]
+      },
+      "team-pack": {
+        "name": "團隊大戶包",
+        "nameEn": "Team Pack",
+        "description": "團隊單次充值，快速補充額度",
+        "features": ["1800 信用點", "單次購買", "團隊共享額度", "批量匯出支援"]
+      },
+      "team-monthly": {
+        "name": "團隊月訂閱",
+        "nameEn": "Team Monthly",
+        "description": "工作室月度標準方案",
+        "features": ["每月 2500 信用點", "多人協作優先", "專屬客服通道", "月度靈活續費"]
+      },
+      "team-yearly": {
+        "name": "團隊年訂閱",
+        "nameEn": "Team Yearly",
+        "description": "年度鎖定最優單價",
+        "yearlyNote": "折合 $37.4/月 · 年度最優",
+        "features": ["每月 3000 信用點", "年度最優價格", "優先新功能體驗", "專屬客戶成功經理"]
       }
     }
   },

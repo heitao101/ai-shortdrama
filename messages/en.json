@@ -15,16 +15,25 @@
     "creditsLabel": "Credits balance"
   },
   "pricing": {
+    "eyebrow": "Pricing",
+    "pageTitle": "Choose Your Creative Plan",
+    "pageTitleEn": "选择适合你的创作方案",
+    "pageSubtitle": "Personal, Professional & Team — 7 flexible plans. Secure payments via Stripe, worldwide cards accepted.",
+    "pageSubtitleEn": "个人、专业、团队三档 · 7 款套餐 · Stripe 安全支付",
     "title": "Buy credits",
-    "subtitle": "Choose a plan and pay securely with Stripe — cards worldwide accepted",
-    "popular": "Most popular",
+    "homeTeaser": "7 plans across Personal, Professional & Team — from starter to studio scale.",
+    "viewAllPlans": "View all plans",
+    "badgePopular": "Most popular",
+    "badgeBestValue": "Best value",
     "perMonth": "/ mo",
-    "creditsIncluded": "{count} credits included",
+    "perYear": "/ yr",
+    "perMonthCredits": "(per month)",
+    "creditsIncluded": "{count} credits",
     "buyNow": "Buy now",
-    "subscribe": "Subscribe to Pro",
-    "successMessage": "Payment successful! Credits have been added — your balance in the header will update shortly.",
+    "subscribe": "Subscribe",
+    "successMessage": "Payment successful! Credits have been added — your balance will update shortly.",
     "canceledMessage": "Checkout canceled. You can return anytime to complete your purchase.",
-    "signInRequired": "Please sign in before purchasing credits",
+    "signInRequired": "Please sign in before purchasing",
     "signInToPurchase": "Sign in to purchase",
     "checkout": {
       "signInRequired": "Please sign in before purchasing",
@@ -32,21 +41,66 @@
       "failed": "Unable to start checkout. Please try again.",
       "processing": "Redirecting…"
     },
+    "tiers": {
+      "personal": {
+        "title": "Personal",
+        "subtitle": "For solo creators and light usage",
+        "subtitleEn": "个人版 — 适合个人创作者"
+      },
+      "professional": {
+        "title": "Professional",
+        "subtitle": "For full-time creators and high output",
+        "subtitleEn": "专业版 — 适合全职创作者"
+      },
+      "team": {
+        "title": "Team",
+        "subtitle": "For studios, MCNs and small teams",
+        "subtitleEn": "团队版 — 适合工作室与团队"
+      }
+    },
     "plans": {
-      "credits_100": {
-        "name": "Starter",
-        "description": "Great for trying DramaAI",
-        "features": ["100 credits", "One-time purchase", "Visa / Mastercard"]
+      "starter": {
+        "name": "Personal Starter",
+        "nameEn": "个人入门包",
+        "description": "One-time pack to try AI short drama",
+        "features": ["120 credits", "One-time purchase", "Visa / Mastercard", "Great for first try"]
       },
-      "credits_500": {
-        "name": "Creator",
-        "description": "Best value for frequent creators",
-        "features": ["500 credits", "One-time purchase", "Priority render queue"]
+      "personal-monthly": {
+        "name": "Personal Monthly",
+        "nameEn": "个人月订阅",
+        "description": "Monthly subscription for steady creation",
+        "features": ["300 credits / month", "Auto-renews monthly", "Priority render queue", "Cancel anytime"]
       },
-      "pro_monthly": {
+      "pro-creator": {
+        "name": "Pro Creator Pack",
+        "nameEn": "专业创作者包",
+        "description": "One-time boost for project-based work",
+        "features": ["600 credits", "One-time purchase", "HD export priority", "Pro style templates"]
+      },
+      "pro-monthly": {
         "name": "Pro Monthly",
-        "description": "Recurring subscription with Pro perks",
-        "features": ["300 credits / month", "Pro badge", "Priority support"]
+        "nameEn": "专业月订阅",
+        "description": "Built for professional creators",
+        "features": ["1000 credits / month", "Pro creator badge", "Priority support", "Advanced storyboard controls"]
+      },
+      "team-pack": {
+        "name": "Team Pack",
+        "nameEn": "团队大户包",
+        "description": "One-time team credit top-up",
+        "features": ["1800 credits", "One-time purchase", "Shared team balance", "Batch export support"]
+      },
+      "team-monthly": {
+        "name": "Team Monthly",
+        "nameEn": "团队月订阅",
+        "description": "Standard monthly plan for studios",
+        "features": ["2500 credits / month", "Collaboration priority", "Dedicated support line", "Flexible monthly billing"]
+      },
+      "team-yearly": {
+        "name": "Team Yearly",
+        "nameEn": "团队年订阅",
+        "description": "Best per-month rate, billed annually",
+        "yearlyNote": "≈ $37.4/mo · Best annual rate",
+        "features": ["3000 credits / month", "Best annual pricing", "Early access to features", "Dedicated success manager"]
       }
     }
   },

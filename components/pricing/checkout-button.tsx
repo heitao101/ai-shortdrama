@@ -8,12 +8,14 @@ import { Button } from "@/components/ui/button";
 import {
   CheckoutError,
   createCheckoutSession,
+  type CheckoutPlanType,
 } from "@/lib/checkout-client";
 import type { PlanId } from "@/lib/stripe-plans";
 import { cn } from "@/lib/utils";
 
 type CheckoutButtonProps = {
-  planId: PlanId;
+  plan: PlanId;
+  type: CheckoutPlanType;
   children: React.ReactNode;
   className?: string;
   variant?: "default" | "outline";
@@ -21,7 +23,8 @@ type CheckoutButtonProps = {
 };
 
 export function CheckoutButton({
-  planId,
+  plan,
+  type,
   children,
   className,
   variant = "default",
@@ -37,9 +40,7 @@ export function CheckoutButton({
     isLoaded && isUserLoaded && isSignedIn && Boolean(userId ?? user?.id);
 
   const handleCheckout = useCallback(async () => {
-    if (!isLoaded || !isUserLoaded) {
-      return;
-    }
+    if (!isLoaded || !isUserLoaded) return;
 
     if (!isSignedIn || !userId) {
       alert(t("signInRequired"));
@@ -49,28 +50,19 @@ export function CheckoutButton({
     setLoading(true);
 
     try {
-      const { url } = await createCheckoutSession(planId, locale, getToken);
+      const { url } = await createCheckoutSession(plan, type, locale, getToken);
       window.location.assign(url);
     } catch (error) {
-      console.error("[checkout]", {
-        error,
-        userId,
-        planId,
-        locale,
-      });
+      console.error("[checkout]", { error, userId, plan, type, locale });
 
       if (error instanceof CheckoutError) {
         if (error.code === "NO_TOKEN") {
           alert(t("tokenError"));
-        } else if (error.code === "NOT_SIGNED_IN") {
-          alert(t("signInRequired"));
         } else {
           alert(error.message || t("failed"));
         }
       } else {
-        alert(
-          error instanceof Error ? error.message : t("failed")
-        );
+        alert(error instanceof Error ? error.message : t("failed"));
       }
 
       setLoading(false);
@@ -80,7 +72,8 @@ export function CheckoutButton({
     isUserLoaded,
     isSignedIn,
     userId,
-    planId,
+    plan,
+    type,
     locale,
     getToken,
     t,
