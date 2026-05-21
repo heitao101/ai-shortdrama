@@ -9,8 +9,9 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-/** Video generation can take several minutes */
-export const maxDuration = 600;
+// Vercel Hobby: max 300s per function. If generation times out, use a shorter prompt,
+// fewer reference images, or split the story into shorter segments and generate separately.
+export const maxDuration = 300;
 
 const MAX_REFERENCE_IMAGES = 6;
 const MIN_PROMPT_LENGTH = 10;
@@ -163,6 +164,7 @@ export async function GET() {
         "bytedance/seedance-v1.0-lite-i2v",
       ],
       accepts: ["application/json", "multipart/form-data"],
+      maxDurationSeconds: maxDuration,
     },
     200
   );
@@ -229,11 +231,17 @@ export async function POST(request: NextRequest) {
     const message =
       error instanceof Error ? error.message : "Video generation failed";
     console.error("[api/generate]", message, error);
+    const isTimeout =
+      /timeout|timed out|deadline|504|FUNCTION_INVOCATION_TIMEOUT/i.test(
+        message
+      );
     return jsonResponse(
       {
         ok: false,
         error: message,
-        hint: "Check AI_GATEWAY_API_KEY and model availability on your Vercel plan",
+        hint: isTimeout
+          ? "Generation timed out. Try a shorter prompt, fewer images, or split into shorter segments."
+          : "Check AI_GATEWAY_API_KEY and model availability on your Vercel plan",
       },
       500
     );

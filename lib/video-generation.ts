@@ -75,7 +75,7 @@ export async function generateDramaVideo(
           mode: "pro",
           multiShot: true,
           pollIntervalMs: 5000,
-          pollTimeoutMs: 600_000,
+          pollTimeoutMs: 280_000,
         },
       },
     });
@@ -108,7 +108,7 @@ export async function generateDramaVideo(
       klingai: {
         mode: "pro",
         pollIntervalMs: 5000,
-        pollTimeoutMs: 600_000,
+        pollTimeoutMs: 280_000,
         ...(elementList ? { elementList } : {}),
       },
     } as unknown as Parameters<typeof generateVideo>[0]["providerOptions"],
